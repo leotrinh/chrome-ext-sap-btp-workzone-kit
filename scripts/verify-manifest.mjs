@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-export const ALLOWED_PERMISSIONS = ["activeTab", "scripting", "storage", "sidePanel"];
+export const ALLOWED_PERMISSIONS = ["storage", "sidePanel"];
 
 /**
  * @param {Record<string, unknown>} manifest
@@ -51,6 +51,15 @@ export function validateManifest(manifest) {
 
   if (typeof manifest.side_panel?.default_path !== "string") {
     errors.push("side_panel.default_path must be set");
+  }
+
+  const BROAD_MATCH_PATTERNS = ["<all_urls>", "*://*/*", "http://*/*", "https://*/*"];
+  for (const script of manifest.content_scripts ?? []) {
+    for (const match of script.matches ?? []) {
+      if (BROAD_MATCH_PATTERNS.includes(match)) {
+        errors.push(`content_scripts match pattern is too broad: ${match}`);
+      }
+    }
   }
 
   return { valid: errors.length === 0, errors };

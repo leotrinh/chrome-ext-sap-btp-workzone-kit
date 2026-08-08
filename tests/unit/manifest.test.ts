@@ -6,7 +6,7 @@ import { validateManifest } from "../../scripts/verify-manifest.mjs";
 const manifestPath = resolve(process.cwd(), "public/manifest.json");
 const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
 
-const ALLOWED_PERMISSIONS = ["activeTab", "scripting", "storage", "sidePanel"];
+const ALLOWED_PERMISSIONS = ["storage", "sidePanel"];
 
 describe("public/manifest.json", () => {
   it("is manifest_version 3", () => {
@@ -35,6 +35,12 @@ describe("public/manifest.json", () => {
 
   it("registers the side panel entry point", () => {
     expect(manifest.side_panel.default_path).toBe("sidepanel/index.html");
+  });
+
+  it("registers the content script (floating button + command relay) scoped to hana.ondemand.com only", () => {
+    expect(manifest.content_scripts).toHaveLength(1);
+    expect(manifest.content_scripts[0].matches).toEqual(["*://*.hana.ondemand.com/*"]);
+    expect(manifest.content_scripts[0].js).toEqual(["content-script.js"]);
   });
 });
 
@@ -66,7 +72,7 @@ describe("validateManifest()", () => {
   it("rejects a manifest missing a required permission", () => {
     const result = validateManifest({
       ...manifest,
-      permissions: ["activeTab", "scripting", "storage"],
+      permissions: ["storage"],
     });
     expect(result.valid).toBe(false);
     expect(result.errors.join(" ")).toMatch(/sidePanel/);
@@ -87,5 +93,14 @@ describe("validateManifest()", () => {
     const result = validateManifest({ ...manifest, manifest_version: 2 });
     expect(result.valid).toBe(false);
     expect(result.errors.join(" ")).toMatch(/manifest_version/);
+  });
+
+  it("rejects a content_scripts match pattern broader than hana.ondemand.com", () => {
+    const result = validateManifest({
+      ...manifest,
+      content_scripts: [{ matches: ["<all_urls>"], js: ["floating-button.js"] }],
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors.join(" ")).toMatch(/too broad/);
   });
 });

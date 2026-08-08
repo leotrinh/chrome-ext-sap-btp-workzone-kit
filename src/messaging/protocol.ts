@@ -30,14 +30,22 @@ export function isKnownWorkzoneCommand(value: unknown): value is WorkzoneCommand
   return typeof value === "string" && (WORKZONE_COMMANDS as readonly string[]).includes(value);
 }
 
+// Present when the request originates from the workspace tab (opened from the
+// in-page floating button) rather than the docked side panel — tells the service
+// worker which SAP tab to operate on instead of assuming "whatever tab is active"
+// (which, once the workspace tab itself is the active tab, would be wrong).
+const targetTabIdSchema = z.number().int().positive().optional();
+
 const NoPayloadRequestSchema = z.object({
   command: z.enum(IMPLEMENTED_NO_PAYLOAD_COMMANDS),
   payload: z.undefined().optional(),
+  targetTabId: targetTabIdSchema,
 });
 
 const NotYetImplementedRequestSchema = z.object({
   command: z.enum(NOT_YET_IMPLEMENTED_COMMANDS),
   payload: z.unknown().optional(),
+  targetTabId: targetTabIdSchema,
 });
 
 const WorkzoneCommandRequestSchema = z.union([
@@ -48,6 +56,7 @@ const WorkzoneCommandRequestSchema = z.union([
 export interface WorkzoneCommandRequest {
   command: WorkzoneCommand;
   payload?: unknown;
+  targetTabId?: number;
 }
 
 export type ParseResult<T> =

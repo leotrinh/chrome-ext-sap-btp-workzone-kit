@@ -21,14 +21,16 @@ mutation, verification, HTML5 refresh, Store release).
 
 Implemented so far:
 
-- Manifest V3 side panel extension shell (React + TypeScript, Vite).
-- Service worker that gates every page operation on HTTPS + a validated SAP BTP Work Zone
-  host + a supported admin route before doing anything.
-- A packaged MAIN-world page runtime (`window.__BTP_WORKZONE_KIT__`) with a fixed,
-  schema-validated command protocol (`PING`, `GET_ENVIRONMENT` implemented; the rest of
-  the command set is reserved but not yet implemented).
+- Manifest V3 side panel extension shell (React + TypeScript, Vite), also reusable as a
+  full workspace tab (see "Floating button" below).
+- A content script (declared in the manifest, auto-injected on eligible pages — see
+  Architecture below) that both renders the floating button and directly handles the
+  fixed, schema-validated command protocol (`PING`, `GET_ENVIRONMENT` implemented; the
+  rest of the command set is reserved but not yet implemented).
 - Environment detection (subaccount/subdomain) from SAP page metadata, with safe fallback
   handling for malformed metadata.
+- A small floating button, auto-injected on eligible Work Zone pages, that opens/focuses
+  a single reusable workspace tab — no need to pin the extension first.
 
 Not yet implemented: CSRF/GraphQL client, app scanning, UI5 version inspection/update,
 bulk mutation, verification, HTML5 refresh, Store packaging assets.
@@ -37,20 +39,35 @@ bulk mutation, verification, HTML5 refresh, Store packaging assets.
 
 - No SAP login is implemented by this extension — you sign in to Work Zone normally.
 - No cookies, passwords, or CSRF tokens are read, stored, or exposed to the side panel.
-- Chrome permissions are limited to `activeTab`, `scripting`, `storage`, `sidePanel` — no
-  host permissions, no `<all_urls>`.
-- The side panel never sends a raw URL, GraphQL document, or script to the page — only one
-  of a fixed set of command names, validated against a schema before it's used.
+- Chrome permissions are limited to `storage`, `sidePanel` — **no `activeTab`, no
+  `scripting`, no `host_permissions`, no `<all_urls>`.** (An earlier iteration of this
+  extension used `activeTab` + `chrome.scripting.executeScript` to inject a runtime
+  on demand; that approach turned out to require a toolbar-icon click specifically —
+  clicking the in-page floating button doesn't count as that gesture, so it could never
+  actually get permission. Switching to a declarative content script, which Chrome
+  auto-injects without needing `activeTab` at all, both fixed the bug and let two
+  permissions be dropped entirely.)
+- One narrowly-scoped content script (`content-script.js`) is declared for
+  `*://*.hana.ondemand.com/*`. Chrome shows this as a site-access permission at install
+  time — this is the only host-level access the extension has, and it's what lets the
+  floating button appear automatically and lets commands run without any further
+  permission prompt. The script only reads `window.location` (for eligibility) and
+  `document.querySelector('meta[...]')` (for environment detection), and makes
+  same-origin `fetch()` calls in later phases — it does not read arbitrary page content,
+  does not touch SAP's own DOM/UI, and only ever executes one of the fixed, Zod-validated
+  `WorkzoneCommand` literals relayed to it by the service worker.
+- The side panel/workspace tab never sends a raw URL, GraphQL document, or script to the
+  page — only one of a fixed set of command names, validated against a schema before use.
 
-## Known limitation
+## Floating button
 
-Chrome only (re-)grants `activeTab` when you invoke the extension (click its toolbar
-icon) on the currently active tab — it is **not** re-granted just because you switched
-tabs while the side panel stayed docked open. If you switch to a different eligible tab
-and the panel reports it can't access the tab, click the SAP BTP Workzone Kit toolbar
-icon once on that tab, then retry. This is a Chrome/Edge platform behavior, not
-something an extension can opt out of without requesting broader host permissions —
-which this extension deliberately does not do (see Security model above).
+On any eligible Work Zone admin page, a small ⚡ button appears in the bottom-right area
+of the page (auto-injected, no need to pin or click the extension icon first). Clicking
+it opens — or focuses, if already open — a single reusable workspace tab with the same
+UI as the side panel. This mirrors the original Tampermonkey helper's discovery UX.
+
+The side panel (via the toolbar icon) still works too — both are just different entry
+points into the same UI, and both relay commands through the same content script.
 
 ## Supported Work Zone routes
 
@@ -80,14 +97,27 @@ pnpm ci              # full chain used in CI
 1. `pnpm build`
 2. Open `chrome://extensions` (or `edge://extensions`), enable Developer mode.
 3. **Load unpacked** → select the `dist/` folder.
-4. Click the extension action on a SAP BTP Work Zone admin tab to open the side panel.
+4. Open a SAP BTP Work Zone admin tab (a supported route, see below) — the ⚡ floating
+   button should appear automatically; click it to open the workspace tab. Or click the
+   extension's toolbar icon to open the side panel instead.
 
 ## Architecture
 
-React side panel ↔ MV3 service worker (validates the active tab, injects the packaged
-runtime) ↔ MAIN-world page runtime (talks to the current SAP session using the signed-in
-user's own permissions). See the blueprint's §5 and §9 for the full diagram and runtime
-contract.
+React side panel/workspace tab → MV3 service worker (resolves which tab to target, no
+permission needed for that) → `chrome.tabs.sendMessage` → the content script already
+running in that tab (declared in the manifest, auto-injected by Chrome, no `activeTab`/
+`host_permissions` needed) → executes the command and talks to the current SAP session
+using the signed-in user's own cookies (same-origin `fetch()` from a content script
+carries them automatically, the same way a page's own script would).
+
+This deviates from the blueprint's §5/§9, which specified a MAIN-world runtime injected
+on demand via `chrome.scripting.executeScript`. That approach needs `activeTab` granted
+for the specific tab being injected into, which Chrome only grants on a toolbar-icon
+click (or context-menu item, or keyboard shortcut) — never on a click handled by a
+content script, which is exactly how the floating button works. Isolated-world content
+scripts don't have that limitation (Chrome pre-authorizes them via the manifest's
+`content_scripts.matches` declaration) and can make the same authenticated same-origin
+requests, so there was no actual need for MAIN-world execution here.
 
 ## Disclaimer
 

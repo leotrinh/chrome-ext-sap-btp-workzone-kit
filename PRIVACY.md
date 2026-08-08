@@ -24,6 +24,10 @@ cookies, or CSRF tokens.
 Supported operations are executed from the user's browser against the current SAP BTP
 Work Zone tenant using the permissions of the currently signed-in SAP account.
 
+A small script runs on `*.hana.ondemand.com` pages to show a floating button on
+supported Work Zone admin routes. It only reads the page's URL (to decide whether to
+show itself) and never reads page content, form data, or SAP application data.
+
 ## 4. Developer data collection
 
 This extension does not transmit SAP tenant data, application configuration,

@@ -13,8 +13,10 @@ CDM, tokens, or other customer data in any report.
 - No SAP credentials, cookies, or CSRF tokens are ever read, stored, or exposed to the
   extension's side panel — see [PRIVACY.md](PRIVACY.md) for the full data-handling
   policy.
-- Chrome/Edge permissions are limited to `activeTab`, `scripting`, `storage`,
-  `sidePanel`. No host permissions, no `<all_urls>`, no `cookies`/`webRequest`.
+- Chrome/Edge permissions are limited to `storage`, `sidePanel`, plus one content script
+  scoped to `*://*.hana.ondemand.com/*` (floating-button discovery UI + command
+  execution — see `docs/system-architecture.md`). No `activeTab`, no `scripting`, no
+  `host_permissions`, no `<all_urls>`, no `cookies`/`webRequest`.
 - All executable code is bundled at build time — no remote scripts, no `eval`, no
   `new Function`. Verified by `pnpm verify:no-remote-code` in CI.
 - The side panel can only request a fixed, schema-validated set of commands from the

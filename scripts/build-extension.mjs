@@ -1,8 +1,9 @@
 import { build } from "vite";
 import react from "@vitejs/plugin-react";
-import { rmSync, mkdirSync, cpSync } from "node:fs";
+import { rmSync, mkdirSync, cpSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
+import { findRootAbsoluteAssetRefs } from "./sidepanel-html-guard.mjs";
 
 const rootDir = fileURLToPath(new URL("..", import.meta.url));
 const distDir = resolve(rootDir, "dist");
@@ -15,16 +16,27 @@ function clean() {
 async function buildSidepanel() {
   await build({
     root: resolve(rootDir, "src/sidepanel"),
+    base: "./",
     plugins: [react()],
     build: {
       outDir: resolve(distDir, "sidepanel"),
       emptyOutDir: true,
     },
   });
+
+  const indexHtmlPath = resolve(distDir, "sidepanel/index.html");
+  const badRefs = findRootAbsoluteAssetRefs(readFileSync(indexHtmlPath, "utf-8"));
+  if (badRefs.length > 0) {
+    throw new Error(
+      `dist/sidepanel/index.html has root-absolute asset references that will 404 ` +
+        `under chrome-extension://<id>/sidepanel/: ${badRefs.join(", ")}. ` +
+        `Check the sidepanel build's "base" option.`,
+    );
+  }
 }
 
 /**
- * Background service worker and MAIN-world page runtime must ship as a single
+ * Background service worker and the content-script bundle must ship as a single
  * self-contained bundle each — no runtime `import` of anything outside the package,
  * no CDN scripts (blueprint §37).
  */
@@ -56,7 +68,7 @@ async function main() {
   clean();
   await buildSidepanel();
   await buildScript("src/background/service-worker.ts", "service-worker.js", "es");
-  await buildScript("src/page-runtime/index.ts", "page-runtime.js", "iife");
+  await buildScript("src/content/index.ts", "content-script.js", "iife");
   copyPublicAssets();
   console.log("Build complete: dist/");
 }

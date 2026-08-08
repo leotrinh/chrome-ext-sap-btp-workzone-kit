@@ -52,10 +52,14 @@ tests/unit/manifest.test.ts
 - [x] `pnpm build` produces `dist/` with `manifest.json` at root.
 - [x] `pnpm verify:manifest` and `pnpm verify:no-remote-code` pass.
 - [ ] Manual: `chrome://extensions` → load unpacked `dist/` → action opens side panel.
-      **Not verifiable from this session** — no real Chrome/Edge browser available
-      (sandboxed browser tool rejects `chrome://` URLs). `pnpm package` output was
-      unzip-verified (manifest.json at root, valid zip structure) as a proxy check.
-      Needs a human to run this before shipping.
+      **Still not verifiable from this session** — no real Chrome/Edge browser
+      available. **The user ran this manually and found the panel blank white.**
+      Root cause: the sidepanel build emitted root-absolute asset URLs (`/assets/...`)
+      that 404 under `chrome-extension://<id>/sidepanel/`. Fixed by building with
+      `base: "./"` in `scripts/build-extension.mjs` (see CHANGELOG.md "Fixed" entry,
+      `tests/unit/sidepanel-html.test.ts`). Re-verify with a fresh `pnpm build` + reload
+      before considering this criterion done — the automated build-time guard prevents
+      the *exact* regression but doesn't replace an actual visual check.
 
 ## Deviations from this file's original plan
 

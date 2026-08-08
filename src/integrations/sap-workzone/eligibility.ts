@@ -26,3 +26,12 @@ export function isSupportedRouteHash(hash: string): boolean {
 export function matchedRouteSegment(hash: string): (typeof VALID_WORKZONE_HASH_SEGMENTS)[number] | null {
   return VALID_WORKZONE_HASH_SEGMENTS.find((segment) => hash.includes(segment)) ?? null;
 }
+
+/**
+ * Full gate for "should the extension surface itself on this page at all" — HTTPS +
+ * Work Zone host + a supported admin route. Shared by the service worker's tab check
+ * and the content-script floating button so the two can never disagree.
+ */
+export function isEligibleWorkzonePage(url: URL): boolean {
+  return isEligibleWorkzoneUrl(url) && isSupportedRouteHash(url.hash);
+}

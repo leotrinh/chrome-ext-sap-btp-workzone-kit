@@ -64,3 +64,36 @@ describe("parseCommandRequest()", () => {
     expect(result.ok).toBe(false);
   });
 });
+
+describe("parseCommandRequest() targetTabId", () => {
+  it("accepts a request with a positive integer targetTabId", () => {
+    const result = parseCommandRequest({ command: "GET_ENVIRONMENT", targetTabId: 42 });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.targetTabId).toBe(42);
+    }
+  });
+
+  it("accepts a request with targetTabId omitted (side-panel mode)", () => {
+    const result = parseCommandRequest({ command: "GET_ENVIRONMENT" });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.targetTabId).toBeUndefined();
+    }
+  });
+
+  it("rejects a negative targetTabId", () => {
+    const result = parseCommandRequest({ command: "GET_ENVIRONMENT", targetTabId: -1 });
+    expect(result.ok).toBe(false);
+  });
+
+  it("rejects a non-integer targetTabId", () => {
+    const result = parseCommandRequest({ command: "GET_ENVIRONMENT", targetTabId: 1.5 });
+    expect(result.ok).toBe(false);
+  });
+
+  it("rejects a string targetTabId (no type coercion)", () => {
+    const result = parseCommandRequest({ command: "GET_ENVIRONMENT", targetTabId: "42" });
+    expect(result.ok).toBe(false);
+  });
+});

@@ -55,10 +55,10 @@ pnpm build             # Vite build + verification scripts
 
 This produces:
 - `dist/manifest.json` (at root, required by Chrome)
-- `dist/side-panel.js` and `dist/side-panel.css` (React side panel)
+- `dist/sidepanel/` (React UI — serves both the docked side panel and the workspace tab)
 - `dist/service-worker.js` (background service worker)
-- `dist/page-runtime.js` (injected page runtime)
-- Other bundled assets
+- `dist/content-script.js` (floating button + command execution — declared as a
+  content script in the manifest, auto-injected by Chrome)
 
 Verification runs automatically:
 - `pnpm verify:manifest` — Validates manifest schema and permissions
@@ -115,9 +115,11 @@ Use this before submitting PRs or preparing releases.
 | Issue | Solution |
 |-------|----------|
 | **Icon not clickable on Work Zone page** | URL is not eligible (wrong domain or route). Check URL matches `*.dt.*.hana.ondemand.com` and hash contains one of the supported routes. |
-| **"Chrome hasn't granted this tab access yet"** | Click the extension icon once on that tab, then retry. This is a Chrome platform limitation for `activeTab` permission—not a bug. |
+| **"No SAP BTP Workzone Kit content script is running on that tab"** | The tab isn't a `hana.ondemand.com` page, or the extension was just reloaded and the page needs a refresh to get the content script re-injected. |
 | **Build fails with TypeScript errors** | Run `pnpm typecheck` to see errors; fix and re-run `pnpm build` |
 | **Manifest validation fails** | Check `dist/manifest.json` was created; if not, re-run `pnpm build`. |
+| **Side panel/workspace tab is blank white, no console error visible** | Historical bug (fixed): the sidepanel build used to emit root-absolute asset URLs (`/assets/...`) that 404 under `chrome-extension://<id>/sidepanel/`. `scripts/build-extension.mjs` now builds with `base: "./"` and throws at build time if a root-absolute reference reappears (see `tests/unit/sidepanel-html.test.ts`). If you see this again, run `pnpm build` fresh and check `dist/sidepanel/index.html`'s `<script src>`/`<link href>` are relative (`./assets/...`). |
+| **⚡ floating button doesn't appear on an eligible page** | Reload the extension (`chrome://extensions` → reload icon) after any rebuild — content scripts don't hot-reload. Confirm the URL is genuinely eligible per the rule above; the button re-checks every 1s. |
 
 ## Production Deployment
 
@@ -256,13 +258,14 @@ The repository includes a **blueprint** for CI/CD pipelines. Currently no automa
 
 ## Known Limitations
 
-### activeTab Permission Gap
+None currently around tab access — the extension no longer relies on `activeTab` at
+all (an earlier iteration did, and hit exactly this kind of permission gap; see
+`docs/system-architecture.md`'s "Overview" section for the full story of why that was
+replaced with a declarative content script instead).
 
-Chrome only grants `activeTab` when you explicitly invoke the extension (click its icon) on that tab. Switching tabs while the panel stays docked does not re-grant the permission.
-
-**Workaround:** Click the extension icon once on the new tab, then retry.
-
-This is a Chrome/Edge platform behavior, not an extension design choice—working around it requires `host_permissions: ["<all_urls>"]`, which we deliberately avoid for security.
+Remaining limitation: the extension reloads (`chrome://extensions` → reload icon) don't
+hot-reload already-open tabs' content scripts — a page opened before a reload needs a
+manual refresh to pick up the new content script.
 
 ### No Background Mutation
 

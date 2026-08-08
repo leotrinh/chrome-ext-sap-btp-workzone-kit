@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   isSapWorkzoneHost,
   isEligibleWorkzoneUrl,
+  isEligibleWorkzonePage,
   isSupportedRouteHash,
   VALID_WORKZONE_HASH_SEGMENTS,
 } from "../../src/integrations/sap-workzone/eligibility";
@@ -66,5 +67,29 @@ describe("isSupportedRouteHash()", () => {
 
   it("rejects an empty hash", () => {
     expect(isSupportedRouteHash("")).toBe(false);
+  });
+});
+
+describe("isEligibleWorkzonePage()", () => {
+  const validHost = "abc123.dt.eu10.hana.ondemand.com";
+
+  it("accepts https + valid host + supported route", () => {
+    const url = new URL(`https://${validHost}/#Content-Manage-someId&/detail`);
+    expect(isEligibleWorkzonePage(url)).toBe(true);
+  });
+
+  it("rejects a valid host/protocol with an unsupported route", () => {
+    const url = new URL(`https://${validHost}/#Some-Other-Route`);
+    expect(isEligibleWorkzonePage(url)).toBe(false);
+  });
+
+  it("rejects a valid host/route over http", () => {
+    const url = new URL(`http://${validHost}/#Content-Manage-someId`);
+    expect(isEligibleWorkzonePage(url)).toBe(false);
+  });
+
+  it("rejects a supported route on an invalid host", () => {
+    const url = new URL("https://example.com/#Content-Manage-someId");
+    expect(isEligibleWorkzonePage(url)).toBe(false);
   });
 });
