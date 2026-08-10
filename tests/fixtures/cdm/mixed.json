@@ -1,0 +1,26 @@
+{
+  "payload": {
+    "targetAppConfig": {
+      "sap.integration": {
+        "urlTemplateParams": {
+          "query": {
+            "sap-ui-version": "1.136.17"
+          }
+        }
+      }
+    },
+    "visualizations": {
+      "launchTile": {
+        "vizConfig": {
+          "sap.flp": {
+            "target": {
+              "parameters": {
+                "sap-ui-version": { "value": "1.120.7", "format": "plain" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

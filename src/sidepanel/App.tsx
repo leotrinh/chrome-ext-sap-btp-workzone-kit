@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { AboutPanel } from "./components/AboutPanel";
 import { AppHeader } from "./components/AppHeader";
+import { AppsPanel } from "./components/AppsPanel";
 import { ConnectionCard } from "./components/ConnectionCard";
 import { Footer } from "./components/Footer";
+import { Html5RefreshCard } from "./components/Html5RefreshCard";
 import { useWorkzoneEnvironment } from "./hooks/useWorkzoneEnvironment";
 
 type TabId = "apps" | "html5" | "about";
@@ -46,13 +48,19 @@ export function App() {
         {activeTab === "apps" && (
           <>
             <ConnectionCard state={state} onRefresh={refresh} />
-            <p className="placeholder-note">
-              App scanning and UI5 version updates arrive in a later phase.
-            </p>
+            {state.status === "ready" && state.environment.eligible && <AppsPanel />}
           </>
         )}
         {activeTab === "html5" && (
-          <p className="placeholder-note">HTML5 content refresh arrives in a later phase.</p>
+          <>
+            {state.status === "ready" && state.environment.eligible ? (
+              <Html5RefreshCard environment={state.environment} />
+            ) : (
+              <p className="placeholder-note">
+                Open an eligible SAP BTP Work Zone admin page to refresh HTML5 content.
+              </p>
+            )}
+          </>
         )}
         {activeTab === "about" && <AboutPanel />}
       </main>

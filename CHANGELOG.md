@@ -1,8 +1,37 @@
 # Changelog
 
-## [Unreleased]
+## [Unreleased] — targeting 0.2.0
 
-### Added
+### Added (Phases 2-9 — full feature set per the hand-off blueprint)
+
+- CSRF acquisition + fixed same-origin GraphQL client with cached-token reuse and a
+  single retry on CSRF rejection (`src/integrations/sap-workzone/{csrf,graphql-client,response-classifier}.ts`).
+- App scanning: paginated `getEntities` (local-apps-only filter, stuck-token guard),
+  concurrency-5-limited `getEntity` detail fetch
+  (`src/integrations/sap-workzone/{app-list,app-detail}.ts`, `src/shared/concurrency.ts`).
+  Wired to `SCAN_APPS`/`GET_APP_VERSION_TARGETS`.
+- UI5 version inspection detecting every supported target (not just the first found),
+  with `none`/`single`/`consistent`/`mixed` classification
+  (`src/integrations/sap-workzone/ui5-version-reader.ts`).
+- Table UX: search, semantic version sort, id-keyed selection surviving filters, global
+  + per-row target version input (`src/domain/{search,sorting,selection}.ts`,
+  `src/sidepanel/components/{SearchBox,SortMenu,VersionInput,AppsTable,AppRow}.tsx`).
+- Update planner: pure diff builder (no-op/mixed-normalization/unsupported detection),
+  confirmation-dialog summary counts (`src/domain/update-plan.ts`,
+  `src/sidepanel/components/{UpdatePreview,ConfirmDialog}.tsx`).
+- Bulk mutation: `batchProcess` GraphQL call against a cloned CDM, sequential queue with
+  a 300ms delay and stop-on-auth/CSRF-failure semantics
+  (`src/integrations/sap-workzone/ui5-version-writer.ts`,
+  `src/sidepanel/hooks/useBulkUpdate.ts`).
+- Post-mutation verification, tracked as a status distinct from mutation success
+  (`src/integrations/sap-workzone/verification.ts`).
+- HTML5 content refresh as an explicitly-confirmed, separate action — never
+  auto-triggered after a UI5 update (`src/integrations/sap-workzone/html5-refresh.ts`,
+  `src/sidepanel/components/Html5RefreshCard.tsx`).
+- GitHub Actions CI (`.github/workflows/ci.yml`) and Store-release docs
+  (`docs/store-listing.md`, `docs/reviewer-instructions.md`, `docs/compatibility.md`).
+
+### Added (Phase 0/1 — foundation)
 
 - Project foundation: Manifest V3 side panel extension (React + TypeScript + Vite),
   service worker, branding, footer/About tab, build/lint/test/verify tooling.

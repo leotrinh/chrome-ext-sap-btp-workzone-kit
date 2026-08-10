@@ -19,11 +19,29 @@ export const WORKZONE_COMMANDS = [
 export type WorkzoneCommand = (typeof WORKZONE_COMMANDS)[number];
 
 /** Commands implemented as of this phase; payload must be absent/undefined. */
-const IMPLEMENTED_NO_PAYLOAD_COMMANDS = ["PING", "GET_ENVIRONMENT"] as const;
+const IMPLEMENTED_NO_PAYLOAD_COMMANDS = [
+  "PING",
+  "GET_ENVIRONMENT",
+  "SCAN_APPS",
+  "REFRESH_HTML5_CONTENT",
+] as const;
+
+/** Commands implemented as of this phase that take exactly `{ appIds: string[] }`. */
+const IMPLEMENTED_APP_ID_PAYLOAD_COMMANDS = ["GET_APP_VERSION_TARGETS"] as const;
+
+/** Commands implemented as of this phase that take `{ appId, changes }`. */
+const IMPLEMENTED_UPDATE_PAYLOAD_COMMANDS = ["UPDATE_APP_UI5_VERSION"] as const;
+
+/** Commands implemented as of this phase that take `{ appId, expectedVersion }`. */
+const IMPLEMENTED_VERIFY_PAYLOAD_COMMANDS = ["VERIFY_APP_UI5_VERSION"] as const;
 
 /** Known future commands (not yet implemented) — still bounded to the fixed set. */
 const NOT_YET_IMPLEMENTED_COMMANDS = WORKZONE_COMMANDS.filter(
-  (command) => !(IMPLEMENTED_NO_PAYLOAD_COMMANDS as readonly string[]).includes(command),
+  (command) =>
+    !(IMPLEMENTED_NO_PAYLOAD_COMMANDS as readonly string[]).includes(command) &&
+    !(IMPLEMENTED_APP_ID_PAYLOAD_COMMANDS as readonly string[]).includes(command) &&
+    !(IMPLEMENTED_UPDATE_PAYLOAD_COMMANDS as readonly string[]).includes(command) &&
+    !(IMPLEMENTED_VERIFY_PAYLOAD_COMMANDS as readonly string[]).includes(command),
 ) as [string, ...string[]];
 
 export function isKnownWorkzoneCommand(value: unknown): value is WorkzoneCommand {
@@ -42,6 +60,48 @@ const NoPayloadRequestSchema = z.object({
   targetTabId: targetTabIdSchema,
 });
 
+const AppIdPayloadRequestSchema = z.object({
+  command: z.enum(IMPLEMENTED_APP_ID_PAYLOAD_COMMANDS),
+  payload: z.object({ appIds: z.array(z.string().min(1)).min(1) }).strict(),
+  targetTabId: targetTabIdSchema,
+});
+
+// Mirrors Ui5VersionChange (src/domain/update-plan.ts) — kept as an independent schema
+// (not imported from the domain type) since this is the wire-format contract, and it
+// must stay a plain-data description regardless of how the domain type evolves.
+const Ui5VersionChangeSchema = z
+  .object({
+    kind: z.enum(["targetAppConfig", "visualization"]),
+    visualizationKey: z.string().optional(),
+    from: z.string().nullable(),
+    to: z.string(),
+    pathDescription: z.string(),
+  })
+  .strict()
+  // A "visualization" change with no key would be silently skipped by the writer
+  // (ui5-version-writer.ts checks `change.visualizationKey` before applying it) —
+  // reject that combination here instead of letting a plan under-apply silently.
+  .refine((change) => change.kind !== "visualization" || change.visualizationKey !== undefined, {
+    message: "visualizationKey is required when kind is 'visualization'",
+  });
+
+const UpdatePayloadRequestSchema = z.object({
+  command: z.enum(IMPLEMENTED_UPDATE_PAYLOAD_COMMANDS),
+  payload: z
+    .object({
+      appId: z.string().min(1),
+      changes: z.array(Ui5VersionChangeSchema).min(1),
+    })
+    .strict(),
+  targetTabId: targetTabIdSchema,
+});
+
+const VerifyPayloadRequestSchema = z.object({
+  command: z.enum(IMPLEMENTED_VERIFY_PAYLOAD_COMMANDS),
+  payload: z.object({ appId: z.string().min(1), expectedVersion: z.string().min(1) }).strict(),
+  targetTabId: targetTabIdSchema,
+});
+
 const NotYetImplementedRequestSchema = z.object({
   command: z.enum(NOT_YET_IMPLEMENTED_COMMANDS),
   payload: z.unknown().optional(),
@@ -50,6 +110,9 @@ const NotYetImplementedRequestSchema = z.object({
 
 const WorkzoneCommandRequestSchema = z.union([
   NoPayloadRequestSchema,
+  AppIdPayloadRequestSchema,
+  UpdatePayloadRequestSchema,
+  VerifyPayloadRequestSchema,
   NotYetImplementedRequestSchema,
 ]);
 

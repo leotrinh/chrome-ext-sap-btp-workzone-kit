@@ -1,0 +1,13 @@
+{
+  "payload": {
+    "targetAppConfig": {
+      "sap.integration": {
+        "urlTemplateParams": {
+          "query": {
+            "sap-ui-version": "1.120.7"
+          }
+        }
+      }
+    }
+  }
+}

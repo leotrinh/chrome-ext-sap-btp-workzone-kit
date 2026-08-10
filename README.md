@@ -13,27 +13,38 @@ Made with ❤️ by Leo — https://buymeacoffee.com/leotrinh
 
 ## Status
 
-This repository currently implements the full blueprint's **Phase 0 (Foundation)** and
-**Phase 1 (Connection)** — see
+All ten phases from
 [hand-off/sap-btp-workzone-kit-codex-blueprint.md](hand-off/sap-btp-workzone-kit-codex-blueprint.md)
-for the complete product spec and remaining phases (scan, UI5 inspection, update planner,
-mutation, verification, HTML5 refresh, Store release).
+are implemented in code, with unit-test coverage for every pure/testable piece of
+business logic (212+ tests). **What has not been done: a manual verification pass
+against a real, authenticated SAP BTP Work Zone tenant in a real Chrome/Edge browser**
+— no real browser or tenant was available while this was built. See
+`docs/compatibility.md` for the exact list of what still needs a human to verify before
+this is used against production data, especially the mutation (bulk UI5 update) and
+HTML5 refresh flows, which write to your SAP tenant.
 
-Implemented so far:
+Implemented:
 
 - Manifest V3 side panel extension shell (React + TypeScript, Vite), also reusable as a
   full workspace tab (see "Floating button" below).
 - A content script (declared in the manifest, auto-injected on eligible pages — see
-  Architecture below) that both renders the floating button and directly handles the
-  fixed, schema-validated command protocol (`PING`, `GET_ENVIRONMENT` implemented; the
-  rest of the command set is reserved but not yet implemented).
+  Architecture below) that renders the floating button and directly handles the full,
+  fixed, schema-validated command protocol.
 - Environment detection (subaccount/subdomain) from SAP page metadata, with safe fallback
   handling for malformed metadata.
-- A small floating button, auto-injected on eligible Work Zone pages, that opens/focuses
-  a single reusable workspace tab — no need to pin the extension first.
-
-Not yet implemented: CSRF/GraphQL client, app scanning, UI5 version inspection/update,
-bulk mutation, verification, HTML5 refresh, Store packaging assets.
+- CSRF acquisition + a fixed same-origin GraphQL client (cached token, single retry on
+  CSRF rejection).
+- App scanning (paginated, local-apps-only, concurrency-5 detail fetch) and UI5 version
+  inspection (every supported target detected, `mixed`/`none` states never silently
+  collapsed to one value).
+- Search, semantic version sort, stable id-keyed selection, global + per-row target
+  version.
+- A pure update planner (diff builder, no-op/mixed-normalization/unsupported detection)
+  behind a mandatory preview + confirmation dialog before anything is sent to SAP.
+- Sequential bulk mutation (300ms delay, stops the queue on an auth/CSRF failure) and
+  post-mutation verification, tracked as a status distinct from mutation success.
+- HTML5 content refresh as its own explicitly-confirmed action — never auto-triggered
+  after a UI5 update.
 
 ## Security model
 
