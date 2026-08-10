@@ -1,5 +1,11 @@
 # SAP BTP Workzone Kit
 
+## Ship by Agent Kit aka Claude Kit
+
+Ship faster with AI Dev Team — [DISCOUNT 25% - PAY ONE TIME, LIFETIME LIFETIME UPDATE](https://agentkit.best/?ref=VAK416FU)
+
+![Claude Kit](https://cdn.tinhtd.info/public/go1/ads_ck.png)
+
 A browser toolkit for inspecting and safely maintaining supported SAP BTP Work Zone
 administration configuration.
 
