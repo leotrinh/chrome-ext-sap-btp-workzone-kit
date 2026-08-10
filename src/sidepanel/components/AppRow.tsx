@@ -44,9 +44,14 @@ export function AppRow({ row, selected, onToggleSelected, onTargetVersionChange 
           value={row.targetVersion}
           onChange={(value) => onTargetVersionChange(row.id, value)}
           disabled={row.status !== "ready"}
+          compact
         />
       </td>
-      <td>{row.status === "loading" ? "Loading" : row.status === "error" ? "Error" : "Ready"}</td>
+      <td>
+        <span className={`status-pill status-pill--${row.status === "loading" ? "loading" : row.status === "error" ? "error" : "ready"}`}>
+          {row.status === "loading" ? "Loading" : row.status === "error" ? "Error" : "Ready"}
+        </span>
+      </td>
     </tr>
   );
 }

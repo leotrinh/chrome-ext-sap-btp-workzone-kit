@@ -30,6 +30,7 @@ export function SortMenu({ column, direction, onChange }: SortMenuProps) {
       </label>
       <button
         type="button"
+        className="btn btn--ghost btn--sm"
         onClick={() => onChange(column, direction === "asc" ? "desc" : "asc")}
         aria-label={`Sort ${direction === "asc" ? "ascending" : "descending"}`}
       >

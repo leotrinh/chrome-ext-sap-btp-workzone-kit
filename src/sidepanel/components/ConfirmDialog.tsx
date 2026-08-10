@@ -7,6 +7,8 @@ interface ConfirmDialogProps {
   onConfirm: () => void;
   onCancel: () => void;
   confirmDisabled?: boolean;
+  /** Color of the confirm button — matches the risk/track of the action it triggers. */
+  confirmVariant?: "warning" | "accent" | "danger";
 }
 
 export function ConfirmDialog({
@@ -16,6 +18,7 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
   confirmDisabled,
+  confirmVariant = "warning",
 }: ConfirmDialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -44,10 +47,15 @@ export function ConfirmDialog({
         <h2 id="confirm-dialog-title">{title}</h2>
         <div className="confirm-dialog__body">{children}</div>
         <div className="confirm-dialog__actions">
-          <button type="button" onClick={onCancel}>
+          <button type="button" className="btn btn--ghost" onClick={onCancel}>
             Cancel
           </button>
-          <button type="button" className="confirm-dialog__confirm" onClick={onConfirm} disabled={confirmDisabled}>
+          <button
+            type="button"
+            className={`btn btn--${confirmVariant}`}
+            onClick={onConfirm}
+            disabled={confirmDisabled}
+          >
             {confirmLabel}
           </button>
         </div>

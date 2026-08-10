@@ -4,7 +4,8 @@ import { useAppSelection } from "../hooks/useAppSelection";
 import { useBulkUpdate } from "../hooks/useBulkUpdate";
 import { SearchBox } from "./SearchBox";
 import { SortMenu, type SortColumn, type SortDirection } from "./SortMenu";
-import { VersionInput } from "./VersionInput";
+import { VersionCombobox } from "./VersionCombobox";
+import { Ui5VersionOverviewModal } from "./Ui5VersionOverviewModal";
 import { AppsTable } from "./AppsTable";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { UpdatePreview } from "./UpdatePreview";
@@ -31,6 +32,7 @@ export function AppsPanel() {
   const [rowOverrides, setRowOverrides] = useState<Record<string, string>>({});
   const [pendingPlans, setPendingPlans] = useState<Ui5VersionUpdatePlan[] | null>(null);
   const [showProgress, setShowProgress] = useState(false);
+  const [showVersionOverview, setShowVersionOverview] = useState(false);
 
   const baseRows: AppRowData[] =
     state.status === "loading_details" || state.status === "ready" ? state.rows : EMPTY_ROWS;
@@ -92,19 +94,32 @@ export function AppsPanel() {
   return (
     <div className="apps-panel">
       <div className="apps-panel__toolbar">
-        <button type="button" onClick={() => void scan()} disabled={isScanning}>
+        <button type="button" className="btn btn--primary" onClick={() => void scan()} disabled={isScanning}>
           {isScanning ? "Scanning…" : "Scan Applications"}
         </button>
         {isScanning && (
-          <button type="button" onClick={cancel}>
+          <button type="button" className="btn btn--ghost" onClick={cancel}>
             Cancel
           </button>
         )}
-        <VersionInput label="Target UI5 Version:" value={globalTargetVersion} onChange={setGlobalTargetVersion} />
-        <button type="button" onClick={applyGlobalToSelected} disabled={selection.selected.size === 0}>
+        <VersionCombobox label="Target UI5 Version:" value={globalTargetVersion} onChange={setGlobalTargetVersion} />
+        <button type="button" className="btn btn--ghost btn--sm" onClick={() => setShowVersionOverview(true)}>
+          Version Overview
+        </button>
+        <button
+          type="button"
+          className="btn btn--secondary"
+          onClick={applyGlobalToSelected}
+          disabled={selection.selected.size === 0}
+        >
           Apply to selected ({selection.selected.size})
         </button>
-        <button type="button" onClick={openPreview} disabled={selection.selected.size === 0 || isUpdating}>
+        <button
+          type="button"
+          className="btn btn--warning"
+          onClick={openPreview}
+          disabled={selection.selected.size === 0 || isUpdating}
+        >
           Update Selected
         </button>
       </div>
@@ -121,12 +136,18 @@ export function AppsPanel() {
           <SortMenu column={sortColumn} direction={sortDirection} onChange={handleSortChange} />
           <button
             type="button"
+            className="btn btn--ghost btn--sm"
             onClick={() => selection.selectVisible(visibleIds)}
             disabled={visibleIds.length === 0}
           >
             Select all visible
           </button>
-          <button type="button" onClick={selection.clear} disabled={selection.selected.size === 0}>
+          <button
+            type="button"
+            className="btn btn--ghost btn--sm"
+            onClick={selection.clear}
+            disabled={selection.selected.size === 0}
+          >
             Clear selection
           </button>
         </div>
@@ -163,6 +184,16 @@ export function AppsPanel() {
             setShowProgress(false);
             bulkUpdate.reset();
           }}
+        />
+      )}
+
+      {showVersionOverview && (
+        <Ui5VersionOverviewModal
+          onSelect={(version) => {
+            setGlobalTargetVersion(version);
+            setShowVersionOverview(false);
+          }}
+          onClose={() => setShowVersionOverview(false)}
         />
       )}
     </div>

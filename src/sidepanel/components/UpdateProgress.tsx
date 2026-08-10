@@ -42,14 +42,14 @@ export function UpdateProgress({ results, onClose, isRunning }: UpdateProgressPr
       </p>
       <ul>
         {entries.map((entry) => (
-          <li key={entry.appId} className={`update-progress__item update-progress__item--${entry.status}`}>
+          <li key={entry.appId} className="update-progress__item">
             <span>{entry.appId}</span>
-            <span>{displayLabel(entry)}</span>
+            <span className={`status-pill status-pill--${entry.status}`}>{displayLabel(entry)}</span>
             {entry.errorMessage && <span className="update-progress__error">{entry.errorMessage}</span>}
           </li>
         ))}
       </ul>
-      <button type="button" onClick={onClose} disabled={isRunning}>
+      <button type="button" className="btn btn--ghost" onClick={onClose} disabled={isRunning}>
         Close
       </button>
     </div>

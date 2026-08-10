@@ -45,7 +45,12 @@ export function Html5RefreshCard({ environment }: Html5RefreshCardProps) {
         </div>
       </dl>
 
-      <button type="button" onClick={() => setConfirming(true)} disabled={!contextAvailable || running}>
+      <button
+        type="button"
+        className="btn btn--accent"
+        onClick={() => setConfirming(true)}
+        disabled={!contextAvailable || running}
+      >
         {running ? "Refreshing…" : "Refresh HTML5 Content"}
       </button>
       {!contextAvailable && (
@@ -69,6 +74,7 @@ export function Html5RefreshCard({ environment }: Html5RefreshCardProps) {
         <ConfirmDialog
           title="Refresh HTML5 Content?"
           confirmLabel="Refresh Content"
+          confirmVariant="accent"
           onCancel={() => setConfirming(false)}
           onConfirm={() => void handleConfirm()}
         >

@@ -5,12 +5,14 @@ interface VersionInputProps {
   onChange: (value: string) => void;
   label?: string;
   disabled?: boolean;
+  /** Narrower layout for tight contexts (table cells): smaller input, hint suppressed unless invalid. */
+  compact?: boolean;
 }
 
-export function VersionInput({ value, onChange, label, disabled }: VersionInputProps) {
+export function VersionInput({ value, onChange, label, disabled, compact }: VersionInputProps) {
   const valid = value.length === 0 || isValidVersionFormat(value);
   return (
-    <span className="version-input">
+    <span className={compact ? "version-input version-input--compact" : "version-input"}>
       {label && <label>{label}</label>}
       <input
         type="text"
@@ -22,9 +24,11 @@ export function VersionInput({ value, onChange, label, disabled }: VersionInputP
         onChange={(event) => onChange(event.target.value)}
         className={valid ? "" : "version-input--invalid"}
       />
-      <span className="version-input__hint">
-        {valid ? "Format valid — existence not verified." : "Expected format: 1.136.17"}
-      </span>
+      {(!compact || !valid) && (
+        <span className="version-input__hint">
+          {valid ? "Format valid — existence not verified." : "Expected format: 1.136.17"}
+        </span>
+      )}
     </span>
   );
 }

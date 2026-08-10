@@ -18,7 +18,7 @@ export function ConnectionCard({ state, onRefresh }: ConnectionCardProps) {
     return (
       <div className="connection-card connection-card--error" role="alert">
         <p>{state.message}</p>
-        <button type="button" onClick={onRefresh}>
+        <button type="button" className="btn btn--danger-outline btn--sm" onClick={onRefresh}>
           Retry
         </button>
       </div>
@@ -35,7 +35,7 @@ export function ConnectionCard({ state, onRefresh }: ConnectionCardProps) {
           Content Manager, Site Directory, Provider Manager, Subaccount Settings, or
           Transport Manager route in a Work Zone tenant, then reopen this panel.
         </p>
-        <button type="button" onClick={onRefresh}>
+        <button type="button" className="btn btn--secondary btn--sm" onClick={onRefresh}>
           Re-check
         </button>
       </div>
@@ -65,7 +65,7 @@ export function ConnectionCard({ state, onRefresh }: ConnectionCardProps) {
           ))}
         </ul>
       )}
-      <button type="button" onClick={onRefresh}>
+      <button type="button" className="btn btn--ghost btn--sm" onClick={onRefresh}>
         Re-check
       </button>
     </div>

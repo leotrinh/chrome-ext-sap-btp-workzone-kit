@@ -40,23 +40,32 @@ version or sort order, once those features ship) in Chrome extension local stora
 (`chrome.storage.local`). No SAP tokens, cookies, CDM, tenant data, or GraphQL responses
 are ever stored there.
 
-## 6. No sale of user data
+## 6. Third-party network request: ui5.sap.com
+
+The side panel's UI5 version picker (quick-filter combobox and "Version Overview"
+modal) fetches SAP's public, unauthenticated version list from
+`https://ui5.sap.com/versionoverview.json` — the same public data SAP publishes at
+https://ui5.sap.com/versionoverview.html. This request carries no cookies, SAP session
+data, or credentials (`credentials: "omit"`), and no data from your SAP tenant is sent
+to ui5.sap.com. It is used only to populate the version list shown to you.
+
+## 7. No sale of user data
 
 The developer does not sell user data.
 
-## 7. External links
+## 8. External links
 
 - GitHub: https://github.com/leotrinh/chrome-ext-sap-btp-workzone-kit
 - Support: https://buymeacoffee.com/leotrinh
 
 These open only after explicit user interaction.
 
-## 8. SAP
+## 9. SAP
 
 SAP BTP Work Zone is a third-party service. Data processed by SAP is governed by the
 agreements and policies applicable to the user's SAP environment.
 
-## 9. Disclaimer
+## 10. Disclaimer
 
 SAP BTP Workzone Kit is an independent browser extension. It is not affiliated with,
 endorsed by, sponsored by, or produced by SAP SE.

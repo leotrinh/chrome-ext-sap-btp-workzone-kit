@@ -58,27 +58,29 @@ export function AppsTable({
   }
 
   return (
-    <table className="apps-table">
-      <thead>
-        <tr>
-          <th />
-          <th>Application</th>
-          <th>Current UI5</th>
-          <th>Target UI5</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        {visibleRows.map((row) => (
-          <AppRow
-            key={row.id}
-            row={row}
-            selected={selected.has(row.id)}
-            onToggleSelected={onToggleSelected}
-            onTargetVersionChange={onTargetVersionChange}
-          />
-        ))}
-      </tbody>
-    </table>
+    <div className="apps-table-wrap">
+      <table className="apps-table">
+        <thead>
+          <tr>
+            <th />
+            <th>Application</th>
+            <th>Current UI5</th>
+            <th>Target UI5</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {visibleRows.map((row) => (
+            <AppRow
+              key={row.id}
+              row={row}
+              selected={selected.has(row.id)}
+              onToggleSelected={onToggleSelected}
+              onTargetVersionChange={onTargetVersionChange}
+            />
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

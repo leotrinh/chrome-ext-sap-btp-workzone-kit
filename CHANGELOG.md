@@ -2,6 +2,25 @@
 
 ## [Unreleased] — targeting 0.2.0
 
+### Added — UI redesign + UI5 version picker
+
+- Full visual redesign of the side panel: design-token-based color system, distinct
+  button variants by action risk/track (`btn--primary/secondary/warning/danger/accent/
+  ghost`), status pills, refined cards/header/tabs/table (`src/sidepanel/app.css` and
+  across `src/sidepanel/components/`). No behavior change — purely visual/markup.
+- "Target UI5 Version" is now a quick-filter combobox
+  (`src/sidepanel/components/VersionCombobox.tsx`) backed by SAP's public version list
+  (`https://ui5.sap.com/versionoverview.json`, `src/integrations/ui5-versions/ui5-version-catalog.ts`) —
+  typing filters real published versions inline; the field still accepts any free-text
+  value (existence is never enforced).
+- New "Version Overview" modal (`src/sidepanel/components/Ui5VersionOverviewModal.tsx`)
+  showing every published SAPUI5 version grouped by minor version with End-of-Cloud-
+  Provisioning dates (mirrors ui5.sap.com's own overview page), with search — clicking
+  a patch sets it as the target version. Fetched lazily, cached for the panel's
+  lifetime, `credentials: "omit"` (no SAP session data ever sent to this third-party
+  host — see `PRIVACY.md` §6). No manifest/permission changes needed: extension pages
+  can fetch cross-origin subject to CORS, and ui5.sap.com allows it.
+
 ### Added (Phases 2-9 — full feature set per the hand-off blueprint)
 
 - CSRF acquisition + fixed same-origin GraphQL client with cached-token reuse and a
