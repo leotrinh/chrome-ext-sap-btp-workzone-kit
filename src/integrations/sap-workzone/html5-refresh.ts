@@ -47,7 +47,9 @@ async function postHtml5Refresh(token: string, subdomain: string, subaccountId: 
     response = await fetch(HTML5_ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-CSRF-Token": token },
-      credentials: "same-origin",
+      // See csrf.ts's fetchCsrfToken() for why this is "include" rather than
+      // "same-origin".
+      credentials: "include",
       body: JSON.stringify({
         providerId: HTML5_PROVIDER_ID,
         contentAdditionMode: HTML5_CONTENT_ADDITION_MODE,

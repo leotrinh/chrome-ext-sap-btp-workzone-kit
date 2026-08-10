@@ -27,7 +27,7 @@ describe("fetchCsrfToken()", () => {
       "/semantic/graphql",
       expect.objectContaining({
         method: "HEAD",
-        credentials: "same-origin",
+        credentials: "include",
         headers: expect.objectContaining({ "x-csrf-token": "Fetch" }),
       }),
     );

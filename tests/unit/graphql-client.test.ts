@@ -46,7 +46,7 @@ describe("executeGraphQlRequest()", () => {
     expect(postCall?.[1]).toEqual(
       expect.objectContaining({
         method: "POST",
-        credentials: "same-origin",
+        credentials: "include",
         headers: expect.objectContaining({ "X-CSRF-Token": "tok-1" }),
       }),
     );

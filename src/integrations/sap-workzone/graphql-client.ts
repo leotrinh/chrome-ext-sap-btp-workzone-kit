@@ -50,13 +50,20 @@ export async function acquireCsrfToken(
 
 type PostResult<T> = GraphQlResult<T> | { retryWithFreshCsrf: true };
 
+function extractOperationName(query: string): string {
+  const match = /\b(query|mutation)\s+(\w+)/.exec(query);
+  return match ? `${match[1]} ${match[2]}` : "unknown operation";
+}
+
 async function postGraphQl<T>(request: GraphQlRequest, token: string): Promise<PostResult<T>> {
   let response: Response;
   try {
     response = await fetch(GRAPHQL_ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-CSRF-Token": token },
-      credentials: "same-origin",
+      // See csrf.ts's fetchCsrfToken() for why this is "include" rather than
+      // "same-origin".
+      credentials: "include",
       body: JSON.stringify(request),
     });
   } catch {
@@ -67,6 +74,19 @@ async function postGraphQl<T>(request: GraphQlRequest, token: string): Promise<P
   }
 
   const httpError = classifyHttpResponseError(response);
+  if (httpError) {
+    // Debug aid, not sensitive: the operation name and URL are static, status is not
+    // sensitive, and the body here is SAP's own server-side error text — never logs
+    // `request.variables` (batchProcess's variables carry the app's CDM) or the
+    // X-CSRF-Token header itself.
+    const bodyText = await response
+      .clone()
+      .text()
+      .catch(() => "<unreadable body>");
+    console.error(
+      `[BTP Workzone Kit] POST ${GRAPHQL_ENDPOINT} (${extractOperationName(request.query)}) -> ${response.status}. Body: ${bodyText || "<empty>"}`,
+    );
+  }
   if (httpError?.code === "CSRF_REJECTED") {
     return { retryWithFreshCsrf: true };
   }

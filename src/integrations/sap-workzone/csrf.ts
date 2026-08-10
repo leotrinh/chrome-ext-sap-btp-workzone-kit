@@ -16,7 +16,13 @@ export async function fetchCsrfToken(): Promise<CsrfResult> {
     response = await fetch(GRAPHQL_ENDPOINT, {
       method: "HEAD",
       headers: { "x-csrf-token": "Fetch" },
-      credentials: "same-origin",
+      // "include" rather than "same-origin": a real page-script request to this exact
+      // relative URL was observed sending "include" (captured via DevTools against a
+      // live tenant). A content script's fetch() can compute same-origin-ness
+      // differently than a genuine page script even for a nominally same-origin
+      // relative URL, so "include" removes that ambiguity — this endpoint is always
+      // same-host (relative URL), so it never sends cookies cross-origin either way.
+      credentials: "include",
     });
   } catch {
     return {
@@ -27,6 +33,16 @@ export async function fetchCsrfToken(): Promise<CsrfResult> {
 
   const classified = classifyHttpResponseError(response);
   if (classified) {
+    // Debug aid, not sensitive: method/URL are static constants, status is not
+    // sensitive, and the body here is SAP's own server-side error text — never a
+    // token or CDM. Never logs the X-CSRF-Token header itself.
+    const bodyText = await response
+      .clone()
+      .text()
+      .catch(() => "<unreadable body>");
+    console.error(
+      `[BTP Workzone Kit] HEAD ${GRAPHQL_ENDPOINT} -> ${response.status}. Body: ${bodyText || "<empty>"}`,
+    );
     return { ok: false, error: classified };
   }
 
