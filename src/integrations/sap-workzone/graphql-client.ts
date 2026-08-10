@@ -70,7 +70,17 @@ async function postGraphQl<T>(request: GraphQlRequest, token: string): Promise<P
   if (httpError?.code === "CSRF_REJECTED") {
     return { retryWithFreshCsrf: true };
   }
-  if (httpError) {
+  // AUTHENTICATION_REQUIRED (redirect/401) and AUTHORIZATION_DENIED (real 403) are
+  // structural failures — SAP won't have sent a meaningful GraphQL body, fail fast.
+  // Any other non-2xx status (generic HTTP_ERROR, e.g. 400/500) still gets checked for
+  // a GraphQL error body below before giving up on it: SAP's GraphQL endpoint can
+  // attach a non-2xx HTTP status to an ordinary GraphQL error response, and the
+  // proven-working reference userscript (hand-off/update-ui-version-script.js)
+  // never gates on HTTP status for GraphQL calls at all — it unconditionally parses
+  // the JSON body and only inspects `errors`. Short-circuiting on HTTP_ERROR here (as
+  // this code used to) discarded that body and replaced a real, actionable GraphQL
+  // error message with an opaque "SAP returned HTTP {status}.".
+  if (httpError?.code === "AUTHENTICATION_REQUIRED" || httpError?.code === "AUTHORIZATION_DENIED") {
     return { ok: false, error: httpError };
   }
 
@@ -78,6 +88,9 @@ async function postGraphQl<T>(request: GraphQlRequest, token: string): Promise<P
   try {
     body = await response.json();
   } catch {
+    if (httpError) {
+      return { ok: false, error: httpError };
+    }
     return {
       ok: false,
       error: { code: "INVALID_RESPONSE", message: "GraphQL response body was not valid JSON." },
@@ -87,6 +100,10 @@ async function postGraphQl<T>(request: GraphQlRequest, token: string): Promise<P
   const graphQlErrorCode = classifyGraphQlBody(body);
   if (graphQlErrorCode) {
     return { ok: false, error: { code: graphQlErrorCode, message: extractGraphQlErrorMessage(body) } };
+  }
+
+  if (httpError) {
+    return { ok: false, error: httpError };
   }
 
   if (body === null || typeof body !== "object" || !("data" in body)) {

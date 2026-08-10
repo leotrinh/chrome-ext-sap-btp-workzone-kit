@@ -82,3 +82,17 @@
   at all — a smaller permission footprint than before, not a larger one. Deleted
   `src/page-runtime/index.ts` (the old MAIN-world bootstrap); `command-handler.ts`'s
   command logic is unchanged, just called directly from the content script now.
+- Scan Applications failed against a real tenant with an opaque "SAP returned HTTP
+  400.", hiding the actual cause: `postGraphQl()` in
+  `src/integrations/sap-workzone/graphql-client.ts` classified any non-2xx HTTP status
+  as an immediate, fatal `HTTP_ERROR` and discarded the response body before ever
+  parsing it. SAP's `/semantic/graphql` endpoint can attach a non-2xx HTTP status to an
+  ordinary GraphQL-level error response — the proven-working reference userscript
+  (`hand-off/update-ui-version-script.js`) never gates on HTTP status for GraphQL calls
+  at all; it unconditionally parses the JSON body and only inspects `errors`. Fixed by
+  only treating redirect/401 (`AUTHENTICATION_REQUIRED`) and real 403
+  (`AUTHORIZATION_DENIED`) as fail-fast structural errors; any other non-2xx status now
+  still gets its body parsed for a GraphQL error first, falling back to the generic
+  `HTTP_ERROR` only when the body isn't a parseable GraphQL error. Applies to every
+  GraphQL call (`getEntities`/`getEntity`/`batchProcess`) since they all route through
+  this one function.

@@ -142,6 +142,60 @@ describe("executeGraphQlRequest()", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("surfaces the real GraphQL error message even when SAP attaches a non-2xx HTTP status (e.g. 400)", async () => {
+    // Regression: SAP's GraphQL endpoint can return HTTP 400 for an ordinary
+    // GraphQL-level error, same as the proven-working reference userscript observed
+    // (hand-off/update-ui-version-script.js never gates on HTTP status for GraphQL
+    // calls — it always parses the body and checks `errors`). Discarding the body on
+    // any non-2xx status replaced this with an opaque "SAP returned HTTP 400."
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(csrfResponse())
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ errors: [{ message: "Invalid queryData.entityTypes value" }] }), {
+          status: 400,
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await executeGraphQlRequest(REQUEST);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toEqual({ code: "GRAPHQL_ERROR", message: "Invalid queryData.entityTypes value" });
+    }
+  });
+
+  it("falls back to the generic HTTP_ERROR when a non-2xx response has no parseable GraphQL error body", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(csrfResponse())
+      .mockResolvedValueOnce(new Response("<html>Bad Gateway</html>", { status: 502 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await executeGraphQlRequest(REQUEST);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toEqual({ code: "HTTP_ERROR", message: "SAP returned HTTP 502." });
+    }
+  });
+
+  it("still fails fast with AUTHORIZATION_DENIED on a real 403 (not a CSRF-required 403)", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(csrfResponse())
+      .mockResolvedValueOnce(new Response(JSON.stringify({ errors: [{ message: "should be ignored" }] }), { status: 403 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await executeGraphQlRequest(REQUEST);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("AUTHORIZATION_DENIED");
+    }
+  });
+
   it("returns NETWORK_ERROR when the POST itself throws", async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(csrfResponse()).mockRejectedValueOnce(new TypeError("net"));
     vi.stubGlobal("fetch", fetchMock);

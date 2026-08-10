@@ -6,7 +6,7 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import globals from "globals";
 
 export default [
-  { ignores: ["dist/**", "node_modules/**", "artifacts/**"] },
+  { ignores: ["dist/**", "node_modules/**", "artifacts/**", "hand-off/**"] },
   {
     languageOptions: {
       ecmaVersion: "latest",
