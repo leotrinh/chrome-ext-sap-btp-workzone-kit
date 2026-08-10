@@ -15,7 +15,7 @@
     "isolatedModules": true,
     "allowJs": true,
     "noEmit": true,
-    "types": ["node", "chrome", "vitest/globals", "@testing-library/jest-dom"]
+    "types": ["node", "chrome", "vite/client", "vitest/globals", "@testing-library/jest-dom"]
   },
   "include": ["src", "tests", "vite.config.ts", "vitest.config.ts", "scripts"]
 }
