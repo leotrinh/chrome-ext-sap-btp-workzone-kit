@@ -44,7 +44,9 @@ FEATURES
   as distinct outcomes
 • Trigger manual HTML5 content refresh (separate, explicitly confirmed action —
   never auto-triggered after a UI5 update)
-• Open the SAPUI5 version overview page
+• Target UI5 Version is a quick-filter combobox backed by SAP's own published
+  version list, plus a full searchable Version Overview picker (grouped by minor
+  version, with End-of-Cloud-Provisioning dates) — click any version to select it
 • Works from a docked side panel or a full workspace tab
 
 SECURITY & PRIVACY
@@ -92,15 +94,26 @@ Provides the scan, preview, update, HTML5 refresh, and results interface as a do
 panel next to the SAP BTP Work Zone tab.
 ```
 
-Content script (`*://*.hana.ondemand.com/*`):
+Host permission (two content scripts both matching `*://*.hana.ondemand.com/*` — the
+Chrome Web Store console treats every `content_scripts` match pattern as a "host
+permission" even without a separate `host_permissions` manifest key):
 
 ```text
-Renders a small floating button on eligible SAP BTP Work Zone admin pages so the
-extension is reachable without pinning it to the toolbar, and executes the fixed,
-schema-validated command set that talks to the current SAP session using the
-signed-in user's own permissions. This is the only host-level access the extension
-requests — there is no separate `host_permissions` entry and no `<all_urls>` access.
+Two content scripts match *://*.hana.ondemand.com/* (SAP BTP Work Zone) - the only
+host-level access this extension requests; there is no separate host_permissions
+entry and no <all_urls> access. One (isolated world) renders a small floating
+button on eligible Work Zone admin pages so the extension is reachable without
+pinning it, and executes a fixed, schema-validated command set against the current
+SAP session using the signed-in user's own permissions. The other (MAIN world)
+performs that same session's fetch() calls to SAP's own GraphQL/REST endpoints,
+needed because a real tenant confirmed some SAP responses only work when the
+request originates from the page's own execution context. Neither script reads
+page content, DOM, or form data beyond the current URL, used only to check route
+eligibility.
 ```
+
+Remote code: **No, I am not using remote code** — verified by `pnpm verify:no-remote-code`
+in CI (see `scripts/check-no-remote-code.mjs`).
 
 ## Screenshots / promotional assets
 

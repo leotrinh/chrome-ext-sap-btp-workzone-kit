@@ -86,6 +86,11 @@ The extension only activates on `*.dt.*.hana.ondemand.com` tabs whose URL hash c
 one of: `Content-Manage`, `Site-Directory`, `Provider-Manage`, `SubAccount-Settings`,
 `Transport-Manager`.
 
+## Contributing
+
+Contributions, bug reports, and feedback are welcome — see
+[CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Development
 
 Requires Node.js and pnpm.
@@ -129,6 +134,10 @@ content script, which is exactly how the floating button works. Isolated-world c
 scripts don't have that limitation (Chrome pre-authorizes them via the manifest's
 `content_scripts.matches` declaration) and can make the same authenticated same-origin
 requests, so there was no actual need for MAIN-world execution here.
+
+## License
+
+[MIT](LICENSE)
 
 ## Disclaimer
 

@@ -3,6 +3,10 @@ import { fileURLToPath } from "node:url";
 
 export const ALLOWED_PERMISSIONS = ["storage", "sidePanel"];
 
+// Chrome Web Store rejects the upload outright if manifest.description exceeds this
+// (confirmed by the exact upload error this check was added for).
+const MAX_DESCRIPTION_LENGTH = 132;
+
 /**
  * @param {Record<string, unknown>} manifest
  * @returns {{ valid: boolean, errors: string[] }}
@@ -51,6 +55,12 @@ export function validateManifest(manifest) {
 
   if (typeof manifest.side_panel?.default_path !== "string") {
     errors.push("side_panel.default_path must be set");
+  }
+
+  if (typeof manifest.description === "string" && manifest.description.length > MAX_DESCRIPTION_LENGTH) {
+    errors.push(
+      `description is too long: ${manifest.description.length}. Chrome Web Store's limit is ${MAX_DESCRIPTION_LENGTH} characters.`,
+    );
   }
 
   const BROAD_MATCH_PATTERNS = ["<all_urls>", "*://*/*", "http://*/*", "https://*/*"];

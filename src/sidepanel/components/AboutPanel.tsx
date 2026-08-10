@@ -39,6 +39,15 @@ export function AboutPanel() {
           </a>
         </li>
         <li>
+          <a
+            href="https://github.com/leotrinh/chrome-ext-sap-btp-workzone-kit/blob/main/CONTRIBUTING.md"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Contributing
+          </a>
+        </li>
+        <li>
           <a href="https://ui5.sap.com/versionoverview.html" target="_blank" rel="noreferrer">
             SAPUI5 Version Overview
           </a>

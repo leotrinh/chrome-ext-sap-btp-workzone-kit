@@ -3,7 +3,8 @@
   "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "Inspect and safely maintain supported SAP BTP Work Zone application UI5 version configuration from the current authenticated admin session.",
+  "license": "MIT",
+  "description": "Inspect and safely maintain SAP BTP Work Zone application UI5 version configuration for the signed-in admin.",
   "scripts": {
     "dev": "vite",
     "typecheck": "tsc --noEmit",

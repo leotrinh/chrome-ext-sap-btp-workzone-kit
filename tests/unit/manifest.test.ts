@@ -49,6 +49,14 @@ describe("public/manifest.json", () => {
     expect(manifest.content_scripts[1].js).toEqual(["main-world-bridge.js"]);
     expect(manifest.content_scripts[1].world).toBe("MAIN");
   });
+
+  it("keeps description within the Chrome Web Store's 132-character limit", () => {
+    // Regression: a 139-char description was rejected at upload time with "The
+    // description field in manifest is too long: 139. It exceeds maximum size
+    // limit of 132 characters." — this test (plus validateManifest() below) catches
+    // that in CI instead of at upload time.
+    expect(manifest.description.length).toBeLessThanOrEqual(132);
+  });
 });
 
 describe("validateManifest()", () => {
@@ -109,5 +117,14 @@ describe("validateManifest()", () => {
     });
     expect(result.valid).toBe(false);
     expect(result.errors.join(" ")).toMatch(/too broad/);
+  });
+
+  it("rejects a description longer than 132 characters (real Chrome Web Store upload error)", () => {
+    const result = validateManifest({
+      ...manifest,
+      description: "x".repeat(139),
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors.join(" ")).toMatch(/too long/);
   });
 });
