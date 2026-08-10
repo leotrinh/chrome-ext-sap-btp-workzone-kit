@@ -69,6 +69,7 @@ async function main() {
   await buildSidepanel();
   await buildScript("src/background/service-worker.ts", "service-worker.js", "es");
   await buildScript("src/content/index.ts", "content-script.js", "iife");
+  await buildScript("src/content/main-world-bridge.ts", "main-world-bridge.js", "iife");
   copyPublicAssets();
   console.log("Build complete: dist/");
 }

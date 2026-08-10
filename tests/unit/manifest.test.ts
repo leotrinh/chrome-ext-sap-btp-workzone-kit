@@ -37,10 +37,17 @@ describe("public/manifest.json", () => {
     expect(manifest.side_panel.default_path).toBe("sidepanel/index.html");
   });
 
-  it("registers the content script (floating button + command relay) scoped to hana.ondemand.com only", () => {
-    expect(manifest.content_scripts).toHaveLength(1);
+  it("registers the isolated-world content script (floating button + command relay) scoped to hana.ondemand.com only", () => {
+    expect(manifest.content_scripts).toHaveLength(2);
     expect(manifest.content_scripts[0].matches).toEqual(["*://*.hana.ondemand.com/*"]);
     expect(manifest.content_scripts[0].js).toEqual(["content-script.js"]);
+    expect(manifest.content_scripts[0].world).toBeUndefined();
+  });
+
+  it("registers the MAIN-world fetch bridge scoped to hana.ondemand.com only", () => {
+    expect(manifest.content_scripts[1].matches).toEqual(["*://*.hana.ondemand.com/*"]);
+    expect(manifest.content_scripts[1].js).toEqual(["main-world-bridge.js"]);
+    expect(manifest.content_scripts[1].world).toBe("MAIN");
   });
 });
 

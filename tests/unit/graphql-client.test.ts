@@ -1,14 +1,19 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { executeGraphQlRequest, resetCsrfCache } from "../../src/integrations/sap-workzone/graphql-client";
+import { toBridgedResponse } from "./helpers/bridged-response";
+
+vi.mock("../../src/content/fetch-bridge", () => ({
+  bridgedFetch: vi.fn(),
+}));
+
+import { bridgedFetch } from "../../src/content/fetch-bridge";
+const bridgedFetchMock = vi.mocked(bridgedFetch);
 
 const REQUEST = { query: "query Ping { ping }", variables: {} };
 
 beforeEach(() => {
   resetCsrfCache();
-});
-
-afterEach(() => {
-  vi.unstubAllGlobals();
+  bridgedFetchMock.mockReset();
 });
 
 function csrfResponse(token = "csrf-token"): Response {
@@ -30,19 +35,21 @@ function csrfRejectedResponse(): Response {
   return new Response(null, { status: 403, headers: { "x-csrf-token": "Required" } });
 }
 
+async function queue(...responses: Response[]): Promise<void> {
+  for (const response of responses) {
+    bridgedFetchMock.mockResolvedValueOnce(await toBridgedResponse(response));
+  }
+}
+
 describe("executeGraphQlRequest()", () => {
   it("fetches CSRF then posts the GraphQL request, returning data on success", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(csrfResponse("tok-1"))
-      .mockResolvedValueOnce(graphQlSuccessResponse({ pong: true }));
-    vi.stubGlobal("fetch", fetchMock);
+    await queue(csrfResponse("tok-1"), graphQlSuccessResponse({ pong: true }));
 
     const result = await executeGraphQlRequest(REQUEST);
 
     expect(result).toEqual({ ok: true, data: { pong: true } });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    const postCall = fetchMock.mock.calls.at(1);
+    expect(bridgedFetchMock).toHaveBeenCalledTimes(2);
+    const postCall = bridgedFetchMock.mock.calls.at(1);
     expect(postCall?.[1]).toEqual(
       expect.objectContaining({
         method: "POST",
@@ -53,42 +60,25 @@ describe("executeGraphQlRequest()", () => {
   });
 
   it("reuses the cached CSRF token across multiple requests (no repeat HEAD)", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(csrfResponse("tok-1"))
-      .mockResolvedValueOnce(graphQlSuccessResponse({ a: 1 }))
-      .mockResolvedValueOnce(graphQlSuccessResponse({ b: 2 }));
-    vi.stubGlobal("fetch", fetchMock);
+    await queue(csrfResponse("tok-1"), graphQlSuccessResponse({ a: 1 }), graphQlSuccessResponse({ b: 2 }));
 
     await executeGraphQlRequest(REQUEST);
     await executeGraphQlRequest(REQUEST);
 
-    expect(fetchMock).toHaveBeenCalledTimes(3); // 1 CSRF fetch + 2 POSTs
+    expect(bridgedFetchMock).toHaveBeenCalledTimes(3); // 1 CSRF fetch + 2 POSTs
   });
 
   it("refetches CSRF and retries exactly once when the token is rejected", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(csrfResponse("stale-token"))
-      .mockResolvedValueOnce(csrfRejectedResponse())
-      .mockResolvedValueOnce(csrfResponse("fresh-token"))
-      .mockResolvedValueOnce(graphQlSuccessResponse({ ok: true }));
-    vi.stubGlobal("fetch", fetchMock);
+    await queue(csrfResponse("stale-token"), csrfRejectedResponse(), csrfResponse("fresh-token"), graphQlSuccessResponse({ ok: true }));
 
     const result = await executeGraphQlRequest(REQUEST);
 
     expect(result).toEqual({ ok: true, data: { ok: true } });
-    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(bridgedFetchMock).toHaveBeenCalledTimes(4);
   });
 
   it("fails with CSRF_REJECTED if the token is rejected twice in a row", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(csrfResponse("t1"))
-      .mockResolvedValueOnce(csrfRejectedResponse())
-      .mockResolvedValueOnce(csrfResponse("t2"))
-      .mockResolvedValueOnce(csrfRejectedResponse());
-    vi.stubGlobal("fetch", fetchMock);
+    await queue(csrfResponse("t1"), csrfRejectedResponse(), csrfResponse("t2"), csrfRejectedResponse());
 
     const result = await executeGraphQlRequest(REQUEST);
 
@@ -96,15 +86,11 @@ describe("executeGraphQlRequest()", () => {
     if (!result.ok) {
       expect(result.error.code).toBe("CSRF_REJECTED");
     }
-    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(bridgedFetchMock).toHaveBeenCalledTimes(4);
   });
 
   it("returns GRAPHQL_ERROR when the response body carries errors", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(csrfResponse())
-      .mockResolvedValueOnce(graphQlErrorResponse("Entity not found"));
-    vi.stubGlobal("fetch", fetchMock);
+    await queue(csrfResponse(), graphQlErrorResponse("Entity not found"));
 
     const result = await executeGraphQlRequest(REQUEST);
 
@@ -115,11 +101,7 @@ describe("executeGraphQlRequest()", () => {
   });
 
   it("returns INVALID_RESPONSE on malformed JSON", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(csrfResponse())
-      .mockResolvedValueOnce(new Response("not json", { status: 200 }));
-    vi.stubGlobal("fetch", fetchMock);
+    await queue(csrfResponse(), new Response("not json", { status: 200 }));
 
     const result = await executeGraphQlRequest(REQUEST);
 
@@ -130,8 +112,7 @@ describe("executeGraphQlRequest()", () => {
   });
 
   it("propagates a CSRF fetch failure without attempting the POST", async () => {
-    const fetchMock = vi.fn().mockResolvedValueOnce(new Response(null, { status: 401 }));
-    vi.stubGlobal("fetch", fetchMock);
+    await queue(new Response(null, { status: 401 }));
 
     const result = await executeGraphQlRequest(REQUEST);
 
@@ -139,7 +120,7 @@ describe("executeGraphQlRequest()", () => {
     if (!result.ok) {
       expect(result.error.code).toBe("AUTHENTICATION_REQUIRED");
     }
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(bridgedFetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("surfaces the real GraphQL error message even when SAP attaches a non-2xx HTTP status (e.g. 400)", async () => {
@@ -148,15 +129,12 @@ describe("executeGraphQlRequest()", () => {
     // (hand-off/update-ui-version-script.js never gates on HTTP status for GraphQL
     // calls — it always parses the body and checks `errors`). Discarding the body on
     // any non-2xx status replaced this with an opaque "SAP returned HTTP 400."
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(csrfResponse())
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ errors: [{ message: "Invalid queryData.entityTypes value" }] }), {
-          status: 400,
-        }),
-      );
-    vi.stubGlobal("fetch", fetchMock);
+    await queue(
+      csrfResponse(),
+      new Response(JSON.stringify({ errors: [{ message: "Invalid queryData.entityTypes value" }] }), {
+        status: 400,
+      }),
+    );
 
     const result = await executeGraphQlRequest(REQUEST);
 
@@ -167,11 +145,7 @@ describe("executeGraphQlRequest()", () => {
   });
 
   it("falls back to the generic HTTP_ERROR when a non-2xx response has no parseable GraphQL error body", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(csrfResponse())
-      .mockResolvedValueOnce(new Response("<html>Bad Gateway</html>", { status: 502 }));
-    vi.stubGlobal("fetch", fetchMock);
+    await queue(csrfResponse(), new Response("<html>Bad Gateway</html>", { status: 502 }));
 
     const result = await executeGraphQlRequest(REQUEST);
 
@@ -182,11 +156,7 @@ describe("executeGraphQlRequest()", () => {
   });
 
   it("still fails fast with AUTHORIZATION_DENIED on a real 403 (not a CSRF-required 403)", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(csrfResponse())
-      .mockResolvedValueOnce(new Response(JSON.stringify({ errors: [{ message: "should be ignored" }] }), { status: 403 }));
-    vi.stubGlobal("fetch", fetchMock);
+    await queue(csrfResponse(), new Response(JSON.stringify({ errors: [{ message: "should be ignored" }] }), { status: 403 }));
 
     const result = await executeGraphQlRequest(REQUEST);
 
@@ -197,8 +167,8 @@ describe("executeGraphQlRequest()", () => {
   });
 
   it("returns NETWORK_ERROR when the POST itself throws", async () => {
-    const fetchMock = vi.fn().mockResolvedValueOnce(csrfResponse()).mockRejectedValueOnce(new TypeError("net"));
-    vi.stubGlobal("fetch", fetchMock);
+    bridgedFetchMock.mockResolvedValueOnce(await toBridgedResponse(csrfResponse()));
+    bridgedFetchMock.mockRejectedValueOnce(new TypeError("net"));
 
     const result = await executeGraphQlRequest(REQUEST);
 

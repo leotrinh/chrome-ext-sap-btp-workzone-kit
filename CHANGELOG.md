@@ -96,3 +96,53 @@
   `HTTP_ERROR` only when the body isn't a parseable GraphQL error. Applies to every
   GraphQL call (`getEntities`/`getEntity`/`batchProcess`) since they all route through
   this one function.
+- The above fix didn't resolve it: `HEAD /semantic/graphql` (CSRF acquisition) kept
+  returning HTTP 400 with an empty body against a real tenant, even though the request
+  was byte-for-byte identical (URL, method, headers, credentials mode) to the proven
+  Tampermonkey reference script's successful request. The only remaining,
+  non-JS-controllable difference was the JS execution realm: the reference script runs
+  as a genuine page script (MAIN world); this extension's fetch() ran from the
+  isolated-world content script. Fixed by adding a declarative MAIN-world content
+  script (`src/content/main-world-bridge.ts`, `public/manifest.json`'s second
+  `content_scripts` entry with `"world": "MAIN"` — no new permissions required) that
+  performs the actual `fetch()` calls in the page's own execution context, reached via
+  `window.postMessage` from the isolated world (`src/content/fetch-bridge.ts`'s
+  `bridgedFetch()`), which is Chrome's own documented pattern for MAIN/ISOLATED world
+  bridging. `csrf.ts`, `graphql-client.ts`, and `html5-refresh.ts` now call
+  `bridgedFetch()` instead of the global `fetch()`.
+- The MAIN-world change above didn't resolve it either: `HEAD /semantic/graphql` was
+  confirmed (via DevTools, against a real tenant) to return HTTP 400 for every caller,
+  including the reference Tampermonkey script itself running as a genuine page
+  script — ruling out execution context as the cause. Meanwhile, the tenant's real
+  `POST /semantic/graphql` (`getEntities`) calls succeeded fine. This points at the
+  gateway/router in front of this endpoint not supporting `HEAD` on this route at all
+  (rejecting it before request reaches the CSRF handshake logic), rather than anything
+  about the request's origin. Fixed by switching the CSRF pre-flight fetch
+  (`src/integrations/sap-workzone/csrf.ts`) from `HEAD` to `GET`, same
+  `x-csrf-token: Fetch` header and endpoint — the same CSRF convention, a method more
+  likely to be proxied correctly.
+- The GET fix above also didn't work: it got past the gateway (unlike HEAD) but was
+  rejected by the GraphQL server itself with `{"errors":[{"message":"Invalid
+  request","extensions":{"code":"BAD_REQUEST"}}]}` — a bodyless GET carries no query
+  for the server to parse. Fixed by switching the CSRF pre-flight to `POST` with a
+  trivial, universally-valid query (`{ __typename }`) — the same transport every other
+  GraphQL call this extension makes (`getEntities`/`getEntity`/`batchProcess`) already
+  uses successfully, same `x-csrf-token: Fetch` handshake header. Only the response's
+  `x-csrf-token` header is read; the query result itself is discarded.
+- **Actual root cause, found by running the real Tampermonkey reference script alone
+  (extension disabled) against a real tenant and comparing its DevTools capture
+  byte-for-byte:** the reference script's `getCsrfToken()` calls
+  `res.headers.get('x-csrf-token')` completely unconditionally — it never checks
+  `res.ok` or the response status at all. The real capture showed `HEAD
+  /semantic/graphql` returning HTTP 400, but the response STILL carried a valid,
+  usable `x-csrf-token` header — the exact token the very next request succeeded
+  with. This extension's `fetchCsrfToken()` called `classifyHttpResponseError()`
+  *before* ever reading the header, discarding a token that was right there any time
+  the status wasn't 2xx. None of the HEAD/GET/POST method changes above were the
+  actual fix (though the GET/POST attempts are why this got caught — SAP's response
+  shape for a non-2xx status turned out to matter less than just not gating on status
+  at all). Fixed by reverting to `HEAD` (matching the reference script exactly, no
+  method change needed) and reading `x-csrf-token` from the response unconditionally,
+  before any status check — status is now only consulted when no usable token is
+  present in the header. Treats `Fetch`/`Required` (SAP's own sentinel values, not
+  real tokens) as "no usable token".

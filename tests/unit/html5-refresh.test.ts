@@ -1,36 +1,38 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { refreshHtml5Content } from "../../src/integrations/sap-workzone/html5-refresh";
 import { resetCsrfCache } from "../../src/integrations/sap-workzone/graphql-client";
+import { toBridgedResponse } from "./helpers/bridged-response";
+
+vi.mock("../../src/content/fetch-bridge", () => ({
+  bridgedFetch: vi.fn(),
+}));
+
+import { bridgedFetch } from "../../src/content/fetch-bridge";
+const bridgedFetchMock = vi.mocked(bridgedFetch);
 
 beforeEach(() => {
   resetCsrfCache();
-});
-
-afterEach(() => {
-  vi.unstubAllGlobals();
+  bridgedFetchMock.mockReset();
 });
 
 function csrfResponse(token = "csrf-token"): Response {
   return new Response(null, { status: 200, headers: { "x-csrf-token": token } });
 }
 
-function mockFetchSequence(...responses: Response[]): ReturnType<typeof vi.fn> {
-  const fetchMock = vi.fn();
+async function mockFetchSequence(...responses: Response[]): Promise<void> {
   for (const response of responses) {
-    fetchMock.mockResolvedValueOnce(response);
+    bridgedFetchMock.mockResolvedValueOnce(await toBridgedResponse(response));
   }
-  vi.stubGlobal("fetch", fetchMock);
-  return fetchMock;
 }
 
 describe("refreshHtml5Content()", () => {
   it("sends the exact fixed payload and reports 'triggered' on success", async () => {
-    const fetchMock = mockFetchSequence(csrfResponse("tok-1"), new Response("OK", { status: 200 }));
+    await mockFetchSequence(csrfResponse("tok-1"), new Response("OK", { status: 200 }));
 
     const result = await refreshHtml5Content("acme-prod", "sub-123");
 
     expect(result).toEqual({ status: "triggered" });
-    const postCall = fetchMock.mock.calls.at(1);
+    const postCall = bridgedFetchMock.mock.calls.at(1);
     expect(postCall?.[0]).toBe("/semantic/entity/provider/html5");
     expect(postCall?.[1]).toEqual(
       expect.objectContaining({
@@ -48,7 +50,7 @@ describe("refreshHtml5Content()", () => {
   });
 
   it("maps a 401 to authentication_required", async () => {
-    mockFetchSequence(csrfResponse(), new Response(null, { status: 401 }));
+    await mockFetchSequence(csrfResponse(), new Response(null, { status: 401 }));
 
     const result = await refreshHtml5Content("acme-prod", "sub-123");
 
@@ -56,7 +58,7 @@ describe("refreshHtml5Content()", () => {
   });
 
   it("maps a 403 (non-CSRF) to authorization_denied", async () => {
-    mockFetchSequence(csrfResponse(), new Response(null, { status: 403 }));
+    await mockFetchSequence(csrfResponse(), new Response(null, { status: 403 }));
 
     const result = await refreshHtml5Content("acme-prod", "sub-123");
 
@@ -64,7 +66,7 @@ describe("refreshHtml5Content()", () => {
   });
 
   it("retries once with a fresh CSRF token, then succeeds", async () => {
-    const fetchMock = mockFetchSequence(
+    await mockFetchSequence(
       csrfResponse("stale"),
       new Response(null, { status: 403, headers: { "x-csrf-token": "Required" } }),
       csrfResponse("fresh"),
@@ -74,11 +76,11 @@ describe("refreshHtml5Content()", () => {
     const result = await refreshHtml5Content("acme-prod", "sub-123");
 
     expect(result).toEqual({ status: "triggered" });
-    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(bridgedFetchMock).toHaveBeenCalledTimes(4);
   });
 
   it("reports csrf_error if the token is rejected twice in a row", async () => {
-    mockFetchSequence(
+    await mockFetchSequence(
       csrfResponse("t1"),
       new Response(null, { status: 403, headers: { "x-csrf-token": "Required" } }),
       csrfResponse("t2"),
@@ -91,7 +93,7 @@ describe("refreshHtml5Content()", () => {
   });
 
   it("maps a 500 to server_error", async () => {
-    mockFetchSequence(csrfResponse(), new Response(null, { status: 500 }));
+    await mockFetchSequence(csrfResponse(), new Response(null, { status: 500 }));
 
     const result = await refreshHtml5Content("acme-prod", "sub-123");
 
@@ -99,8 +101,8 @@ describe("refreshHtml5Content()", () => {
   });
 
   it("maps a network throw during the POST to network_error", async () => {
-    const fetchMock = vi.fn().mockResolvedValueOnce(csrfResponse()).mockRejectedValueOnce(new TypeError("net"));
-    vi.stubGlobal("fetch", fetchMock);
+    bridgedFetchMock.mockResolvedValueOnce(await toBridgedResponse(csrfResponse()));
+    bridgedFetchMock.mockRejectedValueOnce(new TypeError("net"));
 
     const result = await refreshHtml5Content("acme-prod", "sub-123");
 
@@ -108,11 +110,11 @@ describe("refreshHtml5Content()", () => {
   });
 
   it("propagates a CSRF acquisition failure without attempting the POST", async () => {
-    const fetchMock = mockFetchSequence(new Response(null, { status: 401 }));
+    await mockFetchSequence(new Response(null, { status: 401 }));
 
     const result = await refreshHtml5Content("acme-prod", "sub-123");
 
     expect(result.status).toBe("authentication_required");
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(bridgedFetchMock).toHaveBeenCalledTimes(1);
   });
 });

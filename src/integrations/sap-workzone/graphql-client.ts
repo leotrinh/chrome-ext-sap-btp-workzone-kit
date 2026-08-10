@@ -5,6 +5,7 @@ import {
   classifyHttpResponseError,
   extractGraphQlErrorMessage,
 } from "./response-classifier";
+import { bridgedFetch, type BridgedResponse } from "../../content/fetch-bridge";
 import type { WorkzoneRequestError } from "../../shared/errors";
 
 export type GraphQlResult<T> = { ok: true; data: T } | { ok: false; error: WorkzoneRequestError };
@@ -56,13 +57,13 @@ function extractOperationName(query: string): string {
 }
 
 async function postGraphQl<T>(request: GraphQlRequest, token: string): Promise<PostResult<T>> {
-  let response: Response;
+  let response: BridgedResponse;
   try {
-    response = await fetch(GRAPHQL_ENDPOINT, {
+    // See csrf.ts's fetchCsrfToken() for why this goes through bridgedFetch()
+    // (MAIN-world execution) rather than this content script's own fetch().
+    response = await bridgedFetch(GRAPHQL_ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-CSRF-Token": token },
-      // See csrf.ts's fetchCsrfToken() for why this is "include" rather than
-      // "same-origin".
       credentials: "include",
       body: JSON.stringify(request),
     });

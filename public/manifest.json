@@ -20,6 +20,12 @@
       "matches": ["*://*.hana.ondemand.com/*"],
       "js": ["content-script.js"],
       "run_at": "document_idle"
+    },
+    {
+      "matches": ["*://*.hana.ondemand.com/*"],
+      "js": ["main-world-bridge.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
     }
   ],
   "icons": {

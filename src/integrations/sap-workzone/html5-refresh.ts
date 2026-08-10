@@ -5,6 +5,7 @@ import {
 } from "./constants";
 import { acquireCsrfToken } from "./graphql-client";
 import { classifyHttpResponseError } from "./response-classifier";
+import { bridgedFetch, type BridgedResponse } from "../../content/fetch-bridge";
 import type { WorkzoneRequestErrorCode } from "../../shared/errors";
 
 export type Html5RefreshStatus =
@@ -42,13 +43,13 @@ function mapErrorCodeToStatus(code: WorkzoneRequestErrorCode): Html5RefreshStatu
 type PostResult = Html5RefreshResult | { retryWithFreshCsrf: true };
 
 async function postHtml5Refresh(token: string, subdomain: string, subaccountId: string): Promise<PostResult> {
-  let response: Response;
+  let response: BridgedResponse;
   try {
-    response = await fetch(HTML5_ENDPOINT, {
+    // See csrf.ts's fetchCsrfToken() for why this goes through bridgedFetch()
+    // (MAIN-world execution) rather than this content script's own fetch().
+    response = await bridgedFetch(HTML5_ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-CSRF-Token": token },
-      // See csrf.ts's fetchCsrfToken() for why this is "include" rather than
-      // "same-origin".
       credentials: "include",
       body: JSON.stringify({
         providerId: HTML5_PROVIDER_ID,
