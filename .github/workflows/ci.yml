@@ -50,3 +50,33 @@ jobs:
           name: sap-btp-workzone-kit-extension
           path: artifacts/*.zip
           if-no-files-found: error
+
+  release:
+    needs: ci
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download extension artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: sap-btp-workzone-kit-extension
+          path: artifacts
+
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="v$(node -p "require('./package.json').version")"
+          ZIP_PATH=$(ls artifacts/*.zip | head -n1)
+          if gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$VERSION" "$ZIP_PATH" --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$VERSION" "$ZIP_PATH" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "$VERSION" \
+              --generate-notes
+          fi

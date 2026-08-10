@@ -237,16 +237,34 @@ If a build fails to work:
 
 ## CI/CD Integration
 
-The repository includes a **blueprint** for CI/CD pipelines. Currently no automated pipeline exists; manual workflow:
+`.github/workflows/ci.yml` runs on every push to `main`/`master` and every pull
+request:
+
+1. `pnpm typecheck && pnpm lint && pnpm test && pnpm build && pnpm verify:manifest && pnpm verify:no-remote-code`
+2. `pnpm package` — zips `dist/` into `artifacts/sap-btp-workzone-kit-v<version>.zip`
+   (version read from `dist/manifest.json`, see `scripts/package-extension.mjs`)
+3. Uploads that zip as a workflow artifact (`sap-btp-workzone-kit-extension`) on every
+   run, including PRs — useful for manual QA of a PR build without checking it out.
+
+A second `release` job runs only after `ci` succeeds, and only for a `push` to
+`master` (never for pull requests): it downloads the zip the `ci` job just built and
+creates (or updates, if a release for the current `package.json` version already
+exists) a GitHub Release tagged `v<version>` with that zip attached, via the `gh` CLI
+(`GITHUB_TOKEN`, no third-party release action). Bump `version` in both
+`package.json` and `public/manifest.json` before merging to `master` to cut a new
+release; merging without a version bump updates the existing release's asset in
+place instead of creating a duplicate.
+
+Manual workflow around it:
 
 1. Developer commits to feature branch
 2. Developer runs `pnpm ci` locally (full verification chain)
-3. Developer opens PR
+3. Developer opens PR — CI runs, artifact zip available for manual QA
 4. Code review + approval
-5. Merge to `main`
-6. Manual build + test on staging SAP tenant
-7. Tag release: `git tag v1.0.0`
-8. Push tag (future: trigger Chrome Web Store submission)
+5. Merge to `master` — CI runs again, then the release job publishes/updates the
+   GitHub Release automatically
+6. Manual test on a staging SAP tenant before wider distribution
+7. (Future) Chrome Web Store submission from the published release asset
 
 ## Supported Browsers & Versions
 
