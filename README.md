@@ -86,6 +86,11 @@ The extension only activates on `*.dt.*.hana.ondemand.com` tabs whose URL hash c
 one of: `Content-Manage`, `Site-Directory`, `Provider-Manage`, `SubAccount-Settings`,
 `Transport-Manager`.
 
+## Contributing
+
+Contributions, bug reports, and feedback are welcome — see
+[CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Development
 
 Requires Node.js and pnpm.
