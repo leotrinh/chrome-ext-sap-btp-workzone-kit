@@ -2,6 +2,15 @@
 
 ## [Unreleased] — targeting 0.2.0
 
+### Added — automated GitHub Release on merge to master
+
+- `.github/workflows/ci.yml` gained a `release` job that runs after `ci` succeeds,
+  only for a push to `master`. It downloads the extension zip `ci` already built and
+  packaged, then creates (or updates, if one already exists for the current
+  `package.json` version) a GitHub Release tagged `v<version>` with that zip attached
+  — via the `gh` CLI and the workflow's own `GITHUB_TOKEN`, no third-party release
+  action. See `docs/deployment-guide.md`'s "CI/CD Integration" section.
+
 ### Added — UI redesign + UI5 version picker
 
 - Full visual redesign of the side panel: design-token-based color system, distinct
