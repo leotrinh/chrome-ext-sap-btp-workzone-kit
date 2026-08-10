@@ -67,6 +67,11 @@ Match the patterns already in the file you're editing over introducing a new one
 Be respectful, assume good faith, keep disagreements about the code, not the person.
 Reports of abusive behavior can go to the contact below.
 
+## License
+
+MIT — see [LICENSE](LICENSE). By contributing, you agree your contribution is
+licensed under the same terms.
+
 ## Questions
 
 Open an issue, or email Leo at tinhtd.info@gmail.com.

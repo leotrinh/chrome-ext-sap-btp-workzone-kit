@@ -135,6 +135,10 @@ scripts don't have that limitation (Chrome pre-authorizes them via the manifest'
 `content_scripts.matches` declaration) and can make the same authenticated same-origin
 requests, so there was no actual need for MAIN-world execution here.
 
+## License
+
+[MIT](LICENSE)
+
 ## Disclaimer
 
 SAP BTP Workzone Kit is an independent browser extension. It is not affiliated with,
