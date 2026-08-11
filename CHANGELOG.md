@@ -1,6 +1,26 @@
 # Changelog
 
-## [Unreleased] — targeting 0.2.0
+## [0.2.1] — 2026-08-11
+
+### Fixed
+
+- After a bulk UI5 version update finished, nothing visible confirmed it: `UpdateProgress`
+  (`src/sidepanel/components/UpdateProgress.tsx`) rendered as a plain block appended
+  after `<AppsTable>` in the normal document flow — unlike `ConfirmDialog`/
+  `Ui5VersionOverviewModal`, it had no fixed-position backdrop. Against a real tenant
+  scan with many rows, the table pushed the result panel below the side panel's visible
+  viewport, so a successful (or failed) update looked like it produced no message at
+  all. Fixed by rendering it as a fixed-position overlay reusing the existing
+  `.confirm-dialog__backdrop` pattern (`src/sidepanel/app.css`), always visible
+  regardless of table size; closes on Escape/backdrop-click once the queue isn't
+  running.
+- The apps table kept showing the pre-update "Current UI5" version after a successful
+  update — only a manual "Scan Applications" click refreshed it, because
+  `confirmUpdate()` in `src/sidepanel/components/AppsPanel.tsx` never re-triggered
+  `scan()` after `bulkUpdate.run()` finished. Fixed by auto re-scanning once when the
+  bulk update's state transitions to `"completed"`.
+
+## [0.2.0] — 2026-08-10
 
 ### Added — automated GitHub Release on merge to main
 

@@ -1,4 +1,4 @@
-const EXTENSION_VERSION = "0.2.0";
+const EXTENSION_VERSION = "0.2.1";
 
 export function AboutPanel() {
   return (

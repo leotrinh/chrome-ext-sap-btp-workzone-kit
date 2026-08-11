@@ -4,7 +4,7 @@ Last updated: 2026-08-10.
 
 | Field | Value |
 |---|---|
-| Extension version | 0.2.0 (see `package.json`/`public/manifest.json`) |
+| Extension version | 0.2.1 (see `package.json`/`public/manifest.json`) |
 | Adapter/blueprint compatibility | Matches `hand-off/sap-btp-workzone-kit-codex-blueprint.md` §52's GraphQL reference and the source Tampermonkey userscript's proven request shapes |
 | Last manual test against a real tenant | Partial: real DevTools evidence (running the reference Tampermonkey script alone against a live tenant) was used to find and fix the actual CSRF pre-flight bug, but the fix itself has not yet been retested end-to-end — see "Known limitations" |
 | Chrome version tested | Not yet verified in a real browser (sandboxed dev environment can't load `chrome://extensions`) |
