@@ -1,151 +1,594 @@
 # SAP BTP Workzone Kit
 
-## Ship by Agent Kit aka Claude Kit
+A browser toolkit for reducing repetitive SAP BTP Work Zone administration work — especially when maintaining `sap-ui-version` across many applications and environments.
 
-Ship faster with AI Dev Team — [DISCOUNT 25% - PAY ONE TIME, LIFETIME LIFETIME UPDATE](https://agentkit.best/?ref=VAK416FU)
+**Chrome Web Store:**  
+https://chromewebstore.google.com/detail/sap-btp-workzone-kit/kbdalgkmidoabbpcfceppheinkpljobi
 
-![Claude Kit](https://cdn.tinhtd.info/public/go1/ads_ck.png)
+**GitHub:**  
+https://github.com/leotrinh/chrome-ext-sap-btp-workzone-kit
 
-A browser toolkit for inspecting and safely maintaining supported SAP BTP Work Zone
-administration configuration.
+Made with ❤️ by [Leo](https://buymeacoffee.com/leotrinh)
 
-Repository: https://github.com/leotrinh/chrome-ext-sap-btp-workzone-kit
+> **Disclaimer**
+>
+> SAP BTP Workzone Kit is an independent browser extension. It is not affiliated with, endorsed by, sponsored by, or produced by SAP SE. SAP, SAP BTP, SAPUI5, and SAP Build Work Zone are trademarks or registered trademarks of SAP SE or its affiliates.
 
-Made with ❤️ by Leo — https://buymeacoffee.com/leotrinh
+---
 
-> SAP BTP Workzone Kit is an independent browser extension. It is not affiliated with,
-> endorsed by, sponsored by, or produced by SAP SE. SAP, SAP BTP, SAPUI5, and SAP Build
-> Work Zone are trademarks or registered trademarks of SAP SE or its affiliates.
+## Why this exists
 
-## Status
+In real SAP Build Work Zone projects, always running an application against the latest SAPUI5 version is not necessarily what you want.
 
-All ten phases from
-[hand-off/sap-btp-workzone-kit-codex-blueprint.md](hand-off/sap-btp-workzone-kit-codex-blueprint.md)
-are implemented in code, with unit-test coverage for every pure/testable piece of
-business logic (212+ tests). **What has not been done: a manual verification pass
-against a real, authenticated SAP BTP Work Zone tenant in a real Chrome/Edge browser**
-— no real browser or tenant was available while this was built. See
-`docs/compatibility.md` for the exact list of what still needs a human to verify before
-this is used against production data, especially the mutation (bulk UI5 update) and
-HTML5 refresh flows, which write to your SAP tenant.
+An application may need to stay on a known stable UI5 version because of compatibility issues or regressions. In Work Zone, this can be controlled through the custom parameter:
 
-Implemented:
+```text
+sap-ui-version
+```
 
-- Manifest V3 side panel extension shell (React + TypeScript, Vite), also reusable as a
-  full workspace tab (see "Floating button" below).
-- A content script (declared in the manifest, auto-injected on eligible pages — see
-  Architecture below) that renders the floating button and directly handles the full,
-  fixed, schema-validated command protocol.
-- Environment detection (subaccount/subdomain) from SAP page metadata, with safe fallback
-  handling for malformed metadata.
-- CSRF acquisition + a fixed same-origin GraphQL client (cached token, single retry on
-  CSRF rejection).
-- App scanning (paginated, local-apps-only, concurrency-5 detail fetch) and UI5 version
-  inspection (every supported target detected, `mixed`/`none` states never silently
-  collapsed to one value).
-- Search, semantic version sort, stable id-keyed selection, global + per-row target
-  version.
-- A pure update planner (diff builder, no-op/mixed-normalization/unsupported detection)
-  behind a mandatory preview + confirmation dialog before anything is sent to SAP.
-- Sequential bulk mutation (300ms delay, stops the queue on an auth/CSRF failure) and
-  post-mutation verification, tracked as a status distinct from mutation success.
-- HTML5 content refresh as its own explicitly-confirmed action — never auto-triggered
-  after a UI5 update.
+Changing that parameter for one application is easy.
+
+Doing it across many applications and customer environments is not.
+
+For example:
+
+```text
+20 applications
+× 10 customer environments
+= 200 application configurations
+```
+
+The manual workflow can quickly become:
+
+```text
+Content Manager
+→ search for the application
+→ open the application
+→ open its configuration
+→ locate custom parameters
+→ add/update sap-ui-version
+→ save
+→ repeat
+```
+
+The configuration change itself is small.
+
+**Navigation is the expensive part.**
+
+SAP BTP Workzone Kit turns that nested workflow into a flat administration view:
+
+```text
+Application              Current UI5      Target UI5      Status
+-----------------------------------------------------------------
+Sales Overview           1.120.7          1.136.17        Ready
+Order Management         1.120.7          1.136.17        Ready
+Warehouse Monitor        N/A              -               Unsupported
+Customer Portal          Mixed            1.136.17        Review
+```
+
+The goal is simple:
+
+```text
+Inspect → Select → Preview → Update → Verify
+```
+
+---
+
+## From Tampermonkey script to browser extension
+
+This project started as a Tampermonkey helper created to solve the repetitive Work Zone configuration workflow above.
+
+The first version proved that the workflow could be flattened into one list and maintained much faster.
+
+Once the script became useful beyond a single task, it was turned into a proper Chromium extension so it could provide:
+
+- a maintainable codebase;
+- safer write operations;
+- a clearer permission model;
+- reusable UI;
+- automated tests;
+- easier installation;
+- open-source contributions.
+
+The original idea remains the same:
+
+> Don't open the same nested configuration screen hundreds of times for a change that can be represented safely in one table.
+
+---
+
+## Features
+
+### Application scanning
+
+- Scan local SAP BTP Work Zone business applications.
+- Handle paginated Work Zone application lists.
+- Load application details with controlled concurrency.
+- Show app title, ID, current UI5 configuration, target version, and status.
+
+### UI5 version inspection
+
+Detect supported `sap-ui-version` configuration from:
+
+- target application configuration;
+- visualization target parameters.
+
+The extension does not silently collapse different values.
+
+It distinguishes between:
+
+```text
+Configured version
+N/A
+Mixed
+Error
+```
+
+A mixed state can be inspected before making any changes.
+
+### Search and sort
+
+- Search by application name.
+- Search by application ID.
+- Search by current UI5 version.
+- Semantic version-aware sorting.
+- Stable selection while filtering or sorting.
+
+### Target UI5 version
+
+- Set a global target version.
+- Override target version per application.
+- Apply a version to selected applications.
+- Use the quick version selector.
+- Open the full searchable SAPUI5 Version Overview.
+- Review SAP-published version information, including available lifecycle/provisioning information where exposed by the current version dataset.
+
+### Safe bulk update
+
+Bulk changes follow:
+
+```text
+Select
+→ build update plan
+→ preview exact changes
+→ explicit confirmation
+→ sequential update
+→ verification
+```
+
+The extension:
+
+- skips no-op changes;
+- does not guess unsupported CDM structures;
+- updates selected apps sequentially;
+- adds a delay between writes;
+- stops the queue on authentication/CSRF failures;
+- distinguishes mutation success from verification success.
+
+### Post-update verification
+
+A successful mutation is not automatically treated as a verified configuration.
+
+After updating an application, the extension can re-read its configuration and report:
+
+```text
+Updated + Verified
+Updated, verification mismatch
+Updated, verification unavailable
+Failed
+```
+
+### HTML5 content refresh
+
+A separate utility can trigger a manual HTML5 content refresh for the current Work Zone subaccount.
+
+This action:
+
+- uses the detected current environment;
+- requires explicit confirmation;
+- is never automatically triggered after a UI5 version update.
+
+### Two UI entry points
+
+The extension can be opened through:
+
+1. the Chrome/Edge extension toolbar → Side Panel;
+2. the floating ⚡ button on eligible Work Zone administration pages → reusable workspace tab.
+
+Both entry points use the same underlying functionality.
+
+---
+
+## How it works
+
+For this particular Work Zone application-configuration workflow, the extension does not depend on a public API contract that exposes the required operation.
+
+Instead, it operates from the already authenticated Work Zone browser session and reproduces the relevant same-origin operations used by the Work Zone UI.
+
+Conceptually:
+
+```text
+Authenticated SAP BTP Work Zone
+              │
+              ▼
+      SAP BTP Workzone Kit
+              │
+              ▼
+    Existing browser session
+              │
+              ▼
+ Work Zone same-origin UI operations
+```
+
+There is:
+
+```text
+no separate SAP login
+no shared technical account
+no backend proxy
+no extension-managed cookie store
+```
+
+SAP authorization still applies.
+
+If the currently signed-in user is not allowed to perform an operation, the extension does not provide a way around that authorization.
+
+---
 
 ## Security model
 
-- No SAP login is implemented by this extension — you sign in to Work Zone normally.
-- No cookies, passwords, or CSRF tokens are read, stored, or exposed to the side panel.
-- Chrome permissions are limited to `storage`, `sidePanel` — **no `activeTab`, no
-  `scripting`, no `host_permissions`, no `<all_urls>`.** (An earlier iteration of this
-  extension used `activeTab` + `chrome.scripting.executeScript` to inject a runtime
-  on demand; that approach turned out to require a toolbar-icon click specifically —
-  clicking the in-page floating button doesn't count as that gesture, so it could never
-  actually get permission. Switching to a declarative content script, which Chrome
-  auto-injects without needing `activeTab` at all, both fixed the bug and let two
-  permissions be dropped entirely.)
-- One narrowly-scoped content script (`content-script.js`) is declared for
-  `*://*.hana.ondemand.com/*`. Chrome shows this as a site-access permission at install
-  time — this is the only host-level access the extension has, and it's what lets the
-  floating button appear automatically and lets commands run without any further
-  permission prompt. The script only reads `window.location` (for eligibility) and
-  `document.querySelector('meta[...]')` (for environment detection), and makes
-  same-origin `fetch()` calls in later phases — it does not read arbitrary page content,
-  does not touch SAP's own DOM/UI, and only ever executes one of the fixed, Zod-validated
-  `WorkzoneCommand` literals relayed to it by the service worker.
-- The side panel/workspace tab never sends a raw URL, GraphQL document, or script to the
-  page — only one of a fixed set of command names, validated against a schema before use.
+Security and least privilege are part of the product design.
 
-## Floating button
+### Authentication
 
-On any eligible Work Zone admin page, a small ⚡ button appears in the bottom-right area
-of the page (auto-injected, no need to pin or click the extension icon first). Clicking
-it opens — or focuses, if already open — a single reusable workspace tab with the same
-UI as the side panel. This mirrors the original Tampermonkey helper's discovery UX.
+The extension does not implement SAP authentication.
 
-The side panel (via the toolbar icon) still works too — both are just different entry
-points into the same UI, and both relay commands through the same content script.
+You sign in to SAP BTP Work Zone normally.
+
+### Credentials and browser session
+
+The extension does not:
+
+- collect SAP usernames or passwords;
+- use Chrome's `cookies` permission;
+- persist browser cookies;
+- persist CSRF tokens;
+- send SAP session data to a developer-controlled backend.
+
+CSRF tokens required by Work Zone are obtained temporarily for the current operation and are not persisted as extension state.
+
+### Chrome permissions
+
+The current manifest requests only:
+
+```text
+storage
+sidePanel
+```
+
+There is no:
+
+```text
+activeTab
+scripting
+cookies
+<all_urls>
+unlimitedStorage
+```
+
+The extension does declare content scripts scoped to:
+
+```text
+*://*.hana.ondemand.com/*
+```
+
+This is the site-access boundary required for the in-page floating button and Work Zone communication.
+
+Feature eligibility is further restricted to supported SAP Build Work Zone administration hosts/routes.
+
+### Explicit writes
+
+Every write operation requires explicit user action.
+
+UI5 bulk updates require:
+
+```text
+Preview → Confirm → Update
+```
+
+HTML5 refresh requires its own separate confirmation.
+
+---
+
+## Current browser architecture
+
+The current implementation intentionally differs from the first extension blueprint.
+
+It uses two declaratively loaded page-side layers:
+
+```text
+React Side Panel / Workspace Tab
+              │
+              ▼
+       MV3 Service Worker
+              │
+              ▼
+   Isolated-world Content Script
+              │
+              ▼
+      MAIN-world Fetch Bridge
+              │
+              ▼
+ Current SAP Work Zone session
+```
+
+### Isolated-world content script
+
+Responsible for:
+
+- Work Zone eligibility checks;
+- floating-button UX;
+- environment communication;
+- fixed extension command handling;
+- relaying supported operations.
+
+### MAIN-world fetch bridge
+
+Some Work Zone same-origin requests — especially the CSRF/GraphQL flow reproduced from the original Tampermonkey script — needed to execute from the page's own JavaScript world.
+
+The packaged MAIN-world bridge therefore performs the final browser `fetch()` operation in the same page execution context used by the proven userscript flow.
+
+This bridge contains packaged extension code only.
+
+No remote JavaScript is loaded.
+
+### Why not `activeTab` + runtime injection?
+
+An earlier design used:
+
+```text
+activeTab
++
+chrome.scripting.executeScript()
+```
+
+That worked when opening the extension through a toolbar user gesture.
+
+It did not fit the floating-button UX because clicking a button already injected into the page does not grant the same `activeTab` permission.
+
+The current declarative content-script architecture allows both:
+
+```text
+toolbar → side panel
+```
+
+and:
+
+```text
+floating button → workspace tab
+```
+
+without requiring `activeTab` or `scripting` permissions.
+
+---
 
 ## Supported Work Zone routes
 
-The extension only activates on `*.dt.*.hana.ondemand.com` tabs whose URL hash contains
-one of: `Content-Manage`, `Site-Directory`, `Provider-Manage`, `SubAccount-Settings`,
-`Transport-Manager`.
+The extension is intended for SAP Build Work Zone administration pages under the current supported Work Zone host pattern.
 
-## Contributing
+Feature activation is restricted to routes whose URL hash contains one of:
 
-Contributions, bug reports, and feedback are welcome — see
-[CONTRIBUTING.md](CONTRIBUTING.md).
+```text
+Content-Manage
+Site-Directory
+Provider-Manage
+SubAccount-Settings
+Transport-Manager
+```
 
-## Development
+The floating button is hidden outside eligible administration pages.
 
-Requires Node.js and pnpm.
+---
+
+## Compatibility note
+
+The project relies on authenticated SAP BTP Work Zone UI behavior and same-origin internal endpoints used by the Work Zone browser experience.
+
+These are **not treated as a stable public extension API contract** and may change over time.
+
+For that reason:
+
+- Work Zone-specific logic is isolated from the React UI;
+- response shapes are validated;
+- unsupported structures fail safely;
+- mutation and verification are separate outcomes;
+- compatibility assumptions are documented.
+
+Before using write operations against an important production tenant, validate the current release in an appropriate DEV/QAS environment first.
+
+See:
+
+```text
+docs/compatibility.md
+```
+
+for the current compatibility and manual-verification status.
+
+---
+
+## Installation
+
+### Chrome Web Store
+
+Install the published extension:
+
+https://chromewebstore.google.com/detail/sap-btp-workzone-kit/kbdalgkmidoabbpcfceppheinkpljobi
+
+Then:
+
+1. Sign in to SAP BTP Work Zone normally.
+2. Open a supported administration page.
+3. Use the floating ⚡ button or the extension toolbar icon.
+4. Scan applications.
+5. Review current UI5 configuration.
+6. Select and preview changes before updating.
+
+### Load unpacked for development
+
+Requirements:
+
+- Node.js
+- pnpm
 
 ```bash
 pnpm install
-pnpm dev            # side panel dev server (UI only — outside the extension host,
-                     # chrome.* calls fail gracefully instead of being mocked)
-pnpm test           # unit tests
-pnpm typecheck
-pnpm lint
-pnpm build           # produces dist/
-pnpm verify:manifest
-pnpm verify:no-remote-code
-pnpm ci              # full chain used in CI
+pnpm build
 ```
 
-### Load unpacked in Chrome/Edge
+Then:
 
-1. `pnpm build`
-2. Open `chrome://extensions` (or `edge://extensions`), enable Developer mode.
-3. **Load unpacked** → select the `dist/` folder.
-4. Open a SAP BTP Work Zone admin tab (a supported route, see below) — the ⚡ floating
-   button should appear automatically; click it to open the workspace tab. Or click the
-   extension's toolbar icon to open the side panel instead.
+1. Open `chrome://extensions` or `edge://extensions`.
+2. Enable **Developer mode**.
+3. Choose **Load unpacked**.
+4. Select the generated `dist/` folder.
+5. Open an eligible Work Zone administration page.
 
-## Architecture
+---
 
-React side panel/workspace tab → MV3 service worker (resolves which tab to target, no
-permission needed for that) → `chrome.tabs.sendMessage` → the content script already
-running in that tab (declared in the manifest, auto-injected by Chrome, no `activeTab`/
-`host_permissions` needed) → executes the command and talks to the current SAP session
-using the signed-in user's own cookies (same-origin `fetch()` from a content script
-carries them automatically, the same way a page's own script would).
+## Development
 
-This deviates from the blueprint's §5/§9, which specified a MAIN-world runtime injected
-on demand via `chrome.scripting.executeScript`. That approach needs `activeTab` granted
-for the specific tab being injected into, which Chrome only grants on a toolbar-icon
-click (or context-menu item, or keyboard shortcut) — never on a click handled by a
-content script, which is exactly how the floating button works. Isolated-world content
-scripts don't have that limitation (Chrome pre-authorizes them via the manifest's
-`content_scripts.matches` declaration) and can make the same authenticated same-origin
-requests, so there was no actual need for MAIN-world execution here.
+```bash
+pnpm install
+
+pnpm dev
+pnpm test
+pnpm typecheck
+pnpm lint
+
+pnpm build
+pnpm verify:manifest
+pnpm verify:no-remote-code
+
+pnpm ci
+```
+
+`pnpm dev` starts the UI development server. Chrome extension APIs are only fully available when running as an installed/unpacked extension.
+
+---
+
+## Testing
+
+The project includes automated coverage for the core testable logic, including areas such as:
+
+- host and route eligibility;
+- environment metadata parsing;
+- CSRF/request behavior;
+- GraphQL response classification;
+- pagination;
+- concurrency limits;
+- UI5 target detection;
+- mixed-version detection;
+- semantic version sorting;
+- update-plan generation;
+- immutable CDM mutation;
+- no-op handling;
+- verification status;
+- HTML5 refresh behavior;
+- React interaction flows.
+
+Real SAP tenant behavior cannot be completely represented by synthetic fixtures, so manual compatibility testing remains important for operations that write to SAP.
+
+---
+
+## Design principles
+
+The project follows a few simple rules:
+
+```text
+correctness > speed
+preview > surprise
+least privilege > convenience
+verification > optimistic success
+explicit user action > background automation
+```
+
+When a Work Zone structure is unknown:
+
+```text
+fail safely
+```
+
+The extension should never guess a mutation shape.
+
+---
+
+## Contributing
+
+Contributions, bug reports, compatibility findings, and ideas are welcome.
+
+See:
+
+[CONTRIBUTING.md](CONTRIBUTING.md)
+
+Useful contribution areas include:
+
+- additional Work Zone/CDM variants;
+- compatibility improvements;
+- diagnostics;
+- UI/UX improvements;
+- tests;
+- documentation;
+- other small Work Zone administration pain points that fit the project's safety model.
+
+For new write capabilities, please preserve:
+
+```text
+Inspect → Preview → Confirm → Execute → Verify
+```
+
+---
+
+## Reporting issues
+
+When reporting compatibility problems, please avoid posting:
+
+- SAP credentials;
+- cookies;
+- CSRF tokens;
+- production CDM payloads;
+- customer names;
+- private application data;
+- tenant-sensitive screenshots.
+
+Prefer sanitized examples and reproduction steps.
+
+See:
+
+[SECURITY.md](SECURITY.md)
+
+---
+
+## Development tooling
+
+Parts of this open-source project were developed with AI-assisted development tooling.
+
+If you are interested in the tool used during development:
+
+[Agent Kit aka Claude Kit](https://agentkit.best/?ref=VAK416FU) *(referral link)*
+
+This link is intentionally kept here as a small development reference rather than a product banner.
+
+---
 
 ## License
 
 [MIT](LICENSE)
 
+---
+
 ## Disclaimer
 
-SAP BTP Workzone Kit is an independent browser extension. It is not affiliated with,
-endorsed by, sponsored by, or produced by SAP SE.
+SAP BTP Workzone Kit is an independent open-source browser extension.
+
+It is not affiliated with, endorsed by, sponsored by, or produced by SAP SE.
+
+SAP, SAP BTP, SAPUI5, and SAP Build Work Zone are trademarks or registered trademarks of SAP SE or its affiliates.
