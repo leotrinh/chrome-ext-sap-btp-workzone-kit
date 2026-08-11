@@ -1052,10 +1052,13 @@ button:focus-visible,
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-lg);
   padding: 14px 16px;
-  margin-top: 14px;
+  width: min(440px, 92%);
+  max-height: 80vh;
+  overflow-y: auto;
   font-size: 0.85rem;
+  animation: rise-in 160ms ease;
 }
 
 .update-progress > p:first-child {

@@ -17,7 +17,7 @@ import type { WorkzoneRequestError } from "../shared/errors";
 import type { WorkzoneCommand } from "../messaging/protocol";
 import type { WorkzoneCommandResponse } from "./runtime-types";
 
-const RUNTIME_VERSION = "0.2.0";
+const RUNTIME_VERSION = "0.2.1";
 
 function readMetaContent(name: string): string | null {
   return document.querySelector(`meta[name="${name}"]`)?.getAttribute("content") ?? null;

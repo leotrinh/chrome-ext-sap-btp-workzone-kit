@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAppScan } from "../hooks/useAppScan";
 import { useAppSelection } from "../hooks/useAppSelection";
 import { useBulkUpdate } from "../hooks/useBulkUpdate";
@@ -49,6 +49,18 @@ export function AppsPanel() {
 
   const isScanning = state.status === "scanning" || state.status === "loading_details";
   const isUpdating = bulkUpdate.state === "updating";
+
+  // The table's "Current UI5" column comes from the last scan() snapshot, not from the
+  // update results — without this, a successful update kept showing the pre-update
+  // version until the user manually clicked "Scan Applications" again. Re-scan
+  // automatically once the queue finishes so the table reflects reality right away.
+  const previousBulkStateRef = useRef(bulkUpdate.state);
+  useEffect(() => {
+    if (previousBulkStateRef.current !== "completed" && bulkUpdate.state === "completed") {
+      void scan();
+    }
+    previousBulkStateRef.current = bulkUpdate.state;
+  }, [bulkUpdate.state, scan]);
 
   function handleTargetVersionChange(id: string, value: string): void {
     setRowOverrides((current) => ({ ...current, [id]: value }));
