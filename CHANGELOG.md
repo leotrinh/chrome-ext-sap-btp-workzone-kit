@@ -1,5 +1,39 @@
 # Changelog
 
+## [0.3.0] — 2026-08-17
+
+### Changed — floating button opens an in-page overlay instead of a new tab
+
+- The ⚡ floating button on eligible Work Zone pages used to open/focus a separate
+  browser tab loading the side panel bundle (`OPEN_WORKSPACE_TAB`, tracked via
+  `chrome.storage.session`). It now toggles a full-screen modal overlay rendered
+  directly on the Work Zone page itself (`src/content/workzone-overlay.ts`), reusing
+  the exact same `sidepanel/index.html` bundle in a lazily-created iframe — no new tab.
+  The iframe is created once and only hidden/shown on later toggles, so its state (an
+  active scan, an in-progress update) survives closing and reopening the overlay.
+  Closes via the ✕ button, clicking the backdrop, or Escape. The panel is inset from the
+  viewport edges with a translucent backdrop and rounded corners/shadow, rather than a
+  flush white takeover, so it visibly reads as an overlay above the Work Zone page
+  instead of looking like part of it.
+- Removed the now-dead workspace-tab tracking/open/focus logic from
+  `src/background/service-worker.ts` and the `OPEN_WORKSPACE_TAB` UI-message type
+  (`src/messaging/ui-protocol.ts`, deleted — nothing sends it anymore).
+- `public/manifest.json` gained `web_accessible_resources` (`sidepanel/index.html` +
+  `sidepanel/assets/*`, scoped to `*://*.hana.ondemand.com/*`) — required for a web page
+  to embed an extension page in an iframe. This is a genuine (if narrow) trust-boundary
+  widening: any page matching that host pattern can now load the extension's UI in an
+  iframe, not only genuinely eligible admin routes — command execution is unaffected,
+  since `command-relay.ts` independently re-validates real page eligibility before
+  running anything. See `docs/system-architecture.md`'s Security Boundaries section and
+  `SECURITY.md` for the full trade-off. `scripts/verify-manifest.mjs` gained a matching
+  breadth guard for this new manifest key.
+- The `?sourceTabId=`/`targetTabId` wire-protocol mechanism (`src/sidepanel/workspace-context.ts`,
+  `src/messaging/protocol.ts`) that used to bind the old separate workspace tab back to
+  its originating SAP tab is left in place but is now vestigial — no current caller sets
+  it, since the overlay iframe already runs inside the SAP tab it targets. Not removed
+  in this change since narrowing the wire protocol touches ~30 unrelated protocol tests
+  for no behavior change.
+
 ## [0.2.1] — 2026-08-11
 
 ### Fixed

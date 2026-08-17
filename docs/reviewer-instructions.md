@@ -8,7 +8,7 @@ by an AI agent working in this repository.
 ## What's needed
 
 1. **Sanitized screen recording** — a short video showing: the floating button
-   appearing on an eligible Work Zone admin page → opening the workspace tab →
+   appearing on an eligible Work Zone admin page → opening the in-page overlay →
    scanning apps → selecting one and setting a target version → the preview/confirm
    dialog → the update completing → verification result. Blur or redact the real
    tenant hostname, subaccount ID, and any real application names if the recording is

@@ -192,7 +192,8 @@ This action:
 The extension can be opened through:
 
 1. the Chrome/Edge extension toolbar → Side Panel;
-2. the floating ⚡ button on eligible Work Zone administration pages → reusable workspace tab.
+2. the floating ⚡ button on eligible Work Zone administration pages → a full-screen
+   overlay on the same page.
 
 Both entry points use the same underlying functionality.
 
@@ -306,7 +307,7 @@ The current implementation intentionally differs from the first extension bluepr
 It uses two declaratively loaded page-side layers:
 
 ```text
-React Side Panel / Workspace Tab
+React Side Panel / In-Page Overlay
               │
               ▼
        MV3 Service Worker
@@ -364,7 +365,7 @@ toolbar → side panel
 and:
 
 ```text
-floating button → workspace tab
+floating button → in-page overlay
 ```
 
 without requiring `activeTab` or `scripting` permissions.

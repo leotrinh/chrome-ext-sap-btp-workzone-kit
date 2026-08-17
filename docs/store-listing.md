@@ -47,7 +47,7 @@ FEATURES
 • Target UI5 Version is a quick-filter combobox backed by SAP's own published
   version list, plus a full searchable Version Overview picker (grouped by minor
   version, with End-of-Cloud-Provisioning dates) — click any version to select it
-• Works from a docked side panel or a full workspace tab
+• Works from a docked side panel or a full-screen in-page overlay
 
 SECURITY & PRIVACY
 

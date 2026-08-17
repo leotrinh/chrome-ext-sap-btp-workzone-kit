@@ -1,14 +1,15 @@
 # System Architecture
 
-Last Updated: 2026-08-10
+Last Updated: 2026-08-17
 
 ## Overview
 
 SAP BTP Workzone Kit is a Manifest V3 browser extension for Chrome/Edge with four
-runtime layers: a React UI (side panel or workspace tab — same bundle, different host),
-a service worker (tab resolution and message relay), an isolated-world content script
-(command execution, direct access to the SAP page context), and a MAIN-world content
-script (a narrow fetch bridge — see "Layer 4" below).
+runtime layers: a React UI (docked side panel or an in-page full-screen overlay iframe
+— same bundle, different host), a service worker (tab resolution and message relay), an
+isolated-world content script (command execution, direct access to the SAP page
+context), and a MAIN-world content script (a narrow fetch bridge — see "Layer 4"
+below).
 
 **This architecture was corrected mid-Phase-1** from the blueprint's original §5/§9
 design (a MAIN-world runtime injected on demand via `chrome.scripting.executeScript`).
@@ -30,12 +31,23 @@ actually required for this extension's needs.
 
 ## Runtime Layers
 
-### Layer 1: React UI (side panel or workspace tab)
+### Layer 1: React UI (side panel or in-page overlay)
 - **Location:** `src/sidepanel/` — same bundle serves two hosts:
   - Docked side panel (opened via the toolbar icon)
-  - A full workspace tab (opened by the floating button, URL carries `?sourceTabId=<id>`
-    binding it to the SAP tab it was opened from — see `src/sidepanel/workspace-context.ts`)
-- **Role:** User-facing interface (connection status, About panel, future feature controls)
+  - An in-page full-screen overlay (opened by the floating button — see
+    `src/content/workzone-overlay.ts`): a closed-Shadow-DOM backdrop rendered on the SAP
+    page itself, containing an `<iframe src="chrome-extension://<id>/sidepanel/index.html">`.
+    Created lazily on first open, then only hidden/shown on later toggles — the iframe's
+    JS execution context (and whatever React state it holds, e.g. an in-progress scan)
+    survives across close/reopen.
+  - Neither host needs `?sourceTabId=`/`src/sidepanel/workspace-context.ts`'s
+    query-param binding any more — the docked panel never did, and the overlay iframe
+    now runs *inside* the SAP tab it targets, so "whatever tab is active" is already
+    correct without it (see Layer 2 below). That mechanism predates the overlay: it used
+    to bind a *separate* workspace tab back to the SAP tab that opened it. It's left in
+    the wire protocol as vestigial (no current caller sets it) rather than removed,
+    since narrowing it touches ~30 unrelated protocol tests for no behavior change.
+- **Role:** User-facing interface (connection status, About panel, apps table, etc.)
 - **Context:** Extension page; cannot access the SAP page's DOM or session directly
 - **Permissions:** `chrome.runtime` messaging only (to the service worker)
 
@@ -45,26 +57,25 @@ actually required for this extension's needs.
   content script. Does **not** read `tab.url` and does **not** perform host/route
   eligibility checks itself — reading a tab's URL requires the same `activeTab`/
   `host_permissions` this extension deliberately doesn't have, so it can't be done here.
-- **Tab resolution:**
-  - `targetTabId` present (workspace-tab mode): `chrome.tabs.get(targetTabId)` — the
-    exact SAP tab the workspace tab was opened from, regardless of which tab is
-    currently "active" in the browser (the workspace tab itself usually is, by the time
-    a command fires).
-  - `targetTabId` absent (side-panel mode): `chrome.tabs.query({active:true})` — correct
-    there, since the panel is docked next to the still-active SAP tab.
-- **Relay:** `chrome.tabs.sendMessage(tabId, {command, payload})` to the content script
-  already running in that tab. No permission needed for this call itself.
-- **Workspace tab tracking:** single reusable tab (`chrome.storage.session`, not a
-  plain module variable — MV3 service workers are evicted after ~30s idle, which would
-  reset in-memory state and cause duplicate tabs), open/focus calls serialized through a
-  promise queue to avoid a race spawning two tabs from near-simultaneous clicks.
+- **Tab resolution:** `chrome.tabs.query({active:true, currentWindow:true})` — both
+  current callers (docked panel, overlay iframe) omit `targetTabId`, so this fallback is
+  always what resolves the target tab. The explicit-`targetTabId` branch
+  (`chrome.tabs.get(targetTabId)`) is unreachable in practice today; see the docstring
+  on `resolveTargetTabId` for why it's still there.
 
 ### Layer 3: Content Script
 - **Location:** `src/content/`, built as one bundle: `content-script.js`
   - `floating-button.ts` — renders the ⚡ button (closed Shadow DOM, avoids CSS
     collision with SAP's page styles), re-checks eligibility every 1s (Work Zone's SPA
     routing doesn't reliably fire `hashchange`, matching the source Tampermonkey
-    script's proven polling approach)
+    script's proven polling approach). Click toggles the overlay open/closed. Never
+    tears down the host while the overlay is open — an underlying route change (e.g. the
+    browser's own Back button) while an update is running inside the iframe must not
+    silently kill it; teardown is retried on the next 1s poll once the overlay is closed.
+  - `workzone-overlay.ts` — builds the overlay's backdrop/panel/iframe and its
+    close affordances (✕ button, backdrop click, Escape — registered on the capture
+    phase and calling `stopPropagation()`, since this listener lives directly on the
+    real SAP page's `window`, unlike the sidepanel's own in-iframe dialogs).
   - `command-relay.ts` — `chrome.runtime.onMessage` listener: validates the message via
     the same `parseCommandRequest` schema, re-checks `isEligibleWorkzonePage` against
     its own `window.location` (the one place in the extension that *can* read it
@@ -146,13 +157,13 @@ protocol** (blueprint §8):
 
 ### What Crosses the Boundary
 
-- **Panel/workspace tab → Service Worker:** Command name + schema-validated payload +
+- **Panel/overlay iframe → Service Worker:** Command name + schema-validated payload +
   optional `targetTabId` (only)
 - **Service Worker → Content Script:** Command name + payload (already validated once;
   re-validated again on arrival)
 - **Content Script → Service Worker:** Response envelope with success/error result
-- **Service Worker → Panel/workspace tab:** Response envelope (verbatim from the content
-  script, or a service-worker-level error like `TARGET_TAB_CLOSED`)
+- **Service Worker → Panel/overlay iframe:** Response envelope (verbatim from the
+  content script, or a service-worker-level error like `TARGET_TAB_CLOSED`)
 
 ### What Never Crosses
 
@@ -171,6 +182,22 @@ protocol** (blueprint §8):
    known commands are permitted
 4. **Audit-friendly:** Every operation logged in the user's browser console with command
    name and result
+
+### A note on `web_accessible_resources` (the overlay iframe)
+
+Embedding `sidepanel/index.html` in an iframe from the Work Zone page requires listing
+it under `web_accessible_resources`, scoped to `*://*.hana.ondemand.com/*` — the same
+match-pattern limitation noted for `content_scripts` above (Chrome can't express
+"contains `.dt.`", only a single leading `*.` host wildcard). This is a genuine widening
+of the trust boundary versus the tab-based flow it replaced: before, no web page could
+reference `chrome-extension://<id>/sidepanel/index.html` at all; now, *any* origin
+matching that wildcard can `<iframe>` it, not only pages that are actually eligible
+Work Zone admin routes. This is an accepted trade-off, not an oversight — the exposure
+is bounded to display/UI-embedding, not command execution: `command-relay.ts`
+independently re-validates `isEligibleWorkzonePage` against the real page the iframe's
+own commands would actually run against before executing anything, so an ineligible
+embedding origin gains no ability to run `UPDATE_APP_UI5_VERSION` or any other command
+that couldn't already run from that origin's own script context.
 
 ### A note on `window.postMessage` spoofing (Layer 4's fetch bridge)
 
@@ -204,8 +231,8 @@ touch.
 ## Data Flow: Example (PING)
 
 ```
-User clicks "Test Connection" in panel (or the ⚡ button opens the workspace tab, which
-auto-fires GET_ENVIRONMENT on load)
+User clicks "Test Connection" in panel (or the ⚡ button opens the in-page overlay,
+which auto-fires GET_ENVIRONMENT on load)
          ↓
 Panel calls chrome.runtime.sendMessage({ command: "PING", targetTabId? })
          ↓
@@ -256,6 +283,12 @@ When `GET_ENVIRONMENT` is called on an eligible page:
       "run_at": "document_start",
       "world": "MAIN"
     }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["sidepanel/index.html", "sidepanel/assets/*"],
+      "matches": ["*://*.hana.ondemand.com/*"]
+    }
   ]
 }
 ```
@@ -270,6 +303,10 @@ When `GET_ENVIRONMENT` is called on an eligible page:
   anything
 - `content_scripts[1]` (`"world": "MAIN"`) — the fetch bridge (Layer 4 above); same
   match pattern, declared statically so it needs no extra permission either
+- `web_accessible_resources` — lets a `*.hana.ondemand.com` page load
+  `sidepanel/index.html` in an iframe (the floating button's overlay). Same match-pattern
+  caveat as above, plus the trade-off it implies for command execution — see "A note on
+  `web_accessible_resources`" under Security Boundaries.
 
 **No** `activeTab`, `scripting`, `<all_urls>`, `host_permissions`, or cross-origin fetch
 permissions — this is a **smaller** permission footprint than the blueprint's original
@@ -282,9 +319,9 @@ MAIN-world fetch bridge.
   extraction, manifest shape/permission constraints, build-output asset-path guard
 - **Build verification** — Scripts enforce "no remote code" (all script sources are
   local) and reject overly-broad `content_scripts` match patterns
-- **Manual QA** — Load unpacked in real Chrome/Edge to verify the floating button, the
-  workspace tab, and the side panel all correctly show live environment data (automation
-  cannot access `chrome://` URLs, so this step is currently manual-only)
+- **Manual QA** — Load unpacked in real Chrome/Edge to verify the floating button's
+  in-page overlay and the docked side panel both correctly show live environment data
+  (automation cannot access `chrome://` URLs, so this step is currently manual-only)
 
 See `phase-00-foundation.md` / `phase-01-connection.md` acceptance criteria for the full
 checklist.

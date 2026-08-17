@@ -42,39 +42,31 @@ Last Updated: 2026-08-08
 #### Service Worker
 | File | Purpose | Status |
 |------|---------|--------|
-| `src/background/service-worker.ts` | Tab resolution + command relay + workspace-tab lifecycle | ✓ Phase 1 |
+| `src/background/service-worker.ts` | Tab resolution + command relay | ✓ Phase 1 |
 
 **Key functions:**
 - `resolveTargetTabId(targetTabId)` — Resolves *which tab id* to message. Deliberately
   never reads `tab.url` (would require `activeTab`/`host_permissions`, which this
-  extension doesn't have) — just an id lookup, which needs no permission. Uses
-  `chrome.tabs.get(targetTabId)` in workspace-tab mode, `chrome.tabs.query({active:true})`
-  in side-panel mode.
+  extension doesn't have) — just an id lookup, which needs no permission. Both current
+  callers (docked panel, in-page overlay iframe) always omit `targetTabId`, so this
+  always falls back to `chrome.tabs.query({active:true, currentWindow:true})`; the
+  explicit `chrome.tabs.get(targetTabId)` branch is vestigial (unreachable today, kept
+  since narrowing the wire protocol touches ~30 unrelated tests — see the function's
+  docstring).
 - `relayCommandToContentScript(tabId, command, payload)` — `chrome.tabs.sendMessage` to
   the content script already running in that tab. If nothing answers, the tab isn't a
   hana.ondemand.com page (or hasn't finished loading one).
 - `runCommandOnActiveTab()` — Orchestrates: resolve tab id → relay → return response.
-- `openOrFocusWorkspaceTab(sourceTabId)` — Opens the side panel bundle as a normal tab
-  (URL carries `?sourceTabId=<id>`), or re-navigates and focuses it if already open.
-  Tracked tab id lives in `chrome.storage.session` (not a plain module variable — MV3
-  service workers are evicted after ~30s idle, which would reset in-memory state and
-  cause duplicate tabs), and open/focus calls are serialized through a promise queue
-  (`workspaceTabOpQueue`) so two near-simultaneous clicks can't both see "no tab yet"
-  and create two. `sourceTabId` comes from `sender.tab.id` on the `OPEN_WORKSPACE_TAB`
-  message — never trusted from the message payload itself, since `sender.tab` is
-  Chrome-provided and can't be spoofed by the sender.
-- `onMessage` listener branches on message shape: `isUiMessage()` (extension-internal UI
-  intents like `OPEN_WORKSPACE_TAB`) is checked before falling through to the
-  `WorkzoneCommand` protocol — two separate, both-validated message families
 
 #### Content Script
 | File | Purpose | Status |
 |------|---------|--------|
 | `src/content/index.ts` | Entry point, wires up both subsystems below | ✓ |
-| `src/content/floating-button.ts` | Renders the ⚡ button | ✓ |
+| `src/content/floating-button.ts` | Renders the ⚡ button; toggles the overlay | ✓ |
+| `src/content/workzone-overlay.ts` | Full-screen in-page overlay (backdrop + iframe hosting the side panel bundle) | ✓ |
 | `src/content/command-relay.ts` | Handles WorkzoneCommand messages relayed from the service worker | ✓ |
 
-Both bundled together into one output file (`content-script.js`), declared in
+Bundled together into one output file (`content-script.js`), declared in
 `manifest.json` under `content_scripts`, matching `*://*.hana.ondemand.com/*` (Chrome
 match patterns can't express "contains `.dt.`", so both scripts re-check the real
 eligibility rule via `isEligibleWorkzonePage` before doing anything). No `activeTab`/
@@ -82,14 +74,21 @@ eligibility rule via `isEligibleWorkzonePage` before doing anything). No `active
 
 - `floating-button.ts`: polls every 1s (matches the source Tampermonkey script's proven
   approach — Work Zone's SPA routing doesn't reliably fire `hashchange`). Renders into a
-  closed Shadow DOM to avoid CSS collision with SAP's page styles; on click, sends
-  `{ type: "OPEN_WORKSPACE_TAB" }` to the service worker.
+  closed Shadow DOM to avoid CSS collision with SAP's page styles; on click, toggles the
+  overlay built by `workzone-overlay.ts` open/closed (previously: sent
+  `{ type: "OPEN_WORKSPACE_TAB" }` to open a separate browser tab — removed, along with
+  the service worker's tab-tracking logic and `src/messaging/ui-protocol.ts`).
+- `workzone-overlay.ts`: builds the backdrop/panel/close-button once per host mount;
+  the `<iframe src="chrome-extension://<id>/sidepanel/index.html">` itself is created
+  lazily on first `open()`, then just hidden/shown on later toggles so its state
+  (scan results, an in-progress update) survives across close/reopen. Requires
+  `web_accessible_resources` in the manifest (see `docs/system-architecture.md`'s
+  Security Boundaries section for the trust-boundary trade-off this implies).
 - `command-relay.ts`: listens on `chrome.runtime.onMessage`, re-validates the command
-  via `parseCommandRequest` (ignores anything not command-shaped, e.g. this tab's own
-  `OPEN_WORKSPACE_TAB` broadcast), checks `isEligibleWorkzonePage(window.location)`
-  itself (no permission needed for its own page), then calls `handleCommand()` — the
-  same handler function the old MAIN-world runtime used, unchanged; only the injection
-  mechanism changed, not the command logic.
+  via `parseCommandRequest`, checks `isEligibleWorkzonePage(window.location)` itself (no
+  permission needed for its own page), then calls `handleCommand()` — the same handler
+  function the old MAIN-world runtime used, unchanged; only the injection mechanism
+  changed, not the command logic.
 
 #### Command Handler (shared logic, reused from the old page-runtime layer)
 | File | Purpose | Status |
@@ -109,7 +108,6 @@ eligibility rule via `isEligibleWorkzonePage` before doing anything). No `active
 |------|---------|--------|
 | `src/messaging/protocol.ts` | Fixed command set (8 total: 2 implemented, 6 reserved) | ✓ Phase 1 |
 | `src/messaging/validation.ts` | Zod schema validation for panel-to-service-worker messages | ✓ Phase 1 |
-| `src/messaging/ui-protocol.ts` | Separate fixed set for extension-internal UI intents (currently just `OPEN_WORKSPACE_TAB`, sent by the floating button) | ✓ |
 
 **Commands:**
 - **Implemented:** `PING`, `GET_ENVIRONMENT`

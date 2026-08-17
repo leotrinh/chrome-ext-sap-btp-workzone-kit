@@ -55,7 +55,8 @@ pnpm build             # Vite build + verification scripts
 
 This produces:
 - `dist/manifest.json` (at root, required by Chrome)
-- `dist/sidepanel/` (React UI — serves both the docked side panel and the workspace tab)
+- `dist/sidepanel/` (React UI — serves both the docked side panel and the floating
+  button's in-page overlay iframe)
 - `dist/service-worker.js` (background service worker)
 - `dist/content-script.js` (floating button + command execution — declared as a
   content script in the manifest, auto-injected by Chrome)
