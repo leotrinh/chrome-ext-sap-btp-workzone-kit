@@ -50,6 +50,13 @@ describe("public/manifest.json", () => {
     expect(manifest.content_scripts[1].world).toBe("MAIN");
   });
 
+  it("exposes the side panel bundle to hana.ondemand.com only, for the in-page overlay iframe", () => {
+    expect(manifest.web_accessible_resources).toHaveLength(1);
+    const entry = manifest.web_accessible_resources[0];
+    expect(entry.matches).toEqual(["*://*.hana.ondemand.com/*"]);
+    expect(entry.resources).toEqual(["sidepanel/index.html", "sidepanel/assets/*"]);
+  });
+
   it("keeps description within the Chrome Web Store's 132-character limit", () => {
     // Regression: a 139-char description was rejected at upload time with "The
     // description field in manifest is too long: 139. It exceeds maximum size
@@ -114,6 +121,15 @@ describe("validateManifest()", () => {
     const result = validateManifest({
       ...manifest,
       content_scripts: [{ matches: ["<all_urls>"], js: ["floating-button.js"] }],
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors.join(" ")).toMatch(/too broad/);
+  });
+
+  it("rejects a web_accessible_resources match pattern broader than hana.ondemand.com", () => {
+    const result = validateManifest({
+      ...manifest,
+      web_accessible_resources: [{ resources: ["sidepanel/index.html"], matches: ["<all_urls>"] }],
     });
     expect(result.valid).toBe(false);
     expect(result.errors.join(" ")).toMatch(/too broad/);

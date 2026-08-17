@@ -48,10 +48,13 @@ export function isKnownWorkzoneCommand(value: unknown): value is WorkzoneCommand
   return typeof value === "string" && (WORKZONE_COMMANDS as readonly string[]).includes(value);
 }
 
-// Present when the request originates from the workspace tab (opened from the
-// in-page floating button) rather than the docked side panel — tells the service
-// worker which SAP tab to operate on instead of assuming "whatever tab is active"
-// (which, once the workspace tab itself is the active tab, would be wrong).
+// Vestigial: was set by a separate workspace *tab* the floating button used to open,
+// to tell the service worker which SAP tab to operate on instead of assuming "whatever
+// tab is active" (wrong once the workspace tab itself became the active tab). That flow
+// was replaced by an in-page overlay (`src/content/workzone-overlay.ts`) that already
+// runs inside the SAP tab, so no current caller sets this — see the docstring on
+// `resolveTargetTabId` in `src/background/service-worker.ts`. Left in the wire schema
+// since removing it touches ~30 unrelated protocol tests for no behavior change.
 const targetTabIdSchema = z.number().int().positive().optional();
 
 const NoPayloadRequestSchema = z.object({

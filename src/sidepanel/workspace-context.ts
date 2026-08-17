@@ -1,9 +1,11 @@
 /**
- * When the floating button opens this UI as a workspace tab, the service worker binds
- * it to the originating SAP tab via a `?sourceTabId=` query param (see
- * `openOrFocusWorkspaceTab` in the service worker). Absent when running as the docked
- * side panel — there, the service worker falls back to "whatever tab is active",
- * which is correct for panel mode since the panel isn't itself a tab.
+ * Vestigial: the floating button used to open this UI as a separate workspace tab,
+ * bound to the originating SAP tab via this `?sourceTabId=` query param. That flow was
+ * replaced by an in-page overlay (`src/content/workzone-overlay.ts`) that runs inside
+ * the SAP tab itself, so nothing sets this param anymore — every caller (docked panel
+ * and the overlay iframe alike) now relies on the service worker's "whatever tab is
+ * active" fallback, which is correct for both. Kept since the wire protocol still
+ * accepts it (see `src/background/service-worker.ts`'s `resolveTargetTabId`).
  */
 export function getTargetTabIdFromLocationSearch(search: string): number | undefined {
   const raw = new URLSearchParams(search).get("sourceTabId");

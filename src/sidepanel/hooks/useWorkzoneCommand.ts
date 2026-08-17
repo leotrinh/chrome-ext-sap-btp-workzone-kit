@@ -7,9 +7,11 @@ import { getTargetTabIdFromLocationSearch } from "../workspace-context";
  * schema-validated payload, relayed through the service worker. Never a raw URL,
  * GraphQL document, or script.
  *
- * When this UI is running as the workspace tab (opened from the floating button), the
- * URL carries `?sourceTabId=` so the service worker knows which SAP tab to operate on
- * instead of "whatever tab is active" (which would be this tab itself).
+ * `?sourceTabId=` (see `workspace-context.ts`) is vestigial from a since-removed
+ * separate-tab flow — no current caller sets it, so this always resolves to
+ * `undefined` and the service worker falls back to "whatever tab is active", which is
+ * correct both for the docked panel and for the in-page overlay iframe (the overlay
+ * runs inside the SAP tab it targets, so that tab genuinely is the active one).
  */
 export function sendWorkzoneCommand<T = unknown>(
   command: WorkzoneCommand,

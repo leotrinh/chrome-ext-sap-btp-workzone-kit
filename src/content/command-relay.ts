@@ -30,9 +30,8 @@ export function initCommandRelay(): void {
   chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
     const parsed = parseCommandRequest(message);
     if (!parsed.ok) {
-      // Not a WorkzoneCommand-shaped message (e.g. this tab's own OPEN_WORKSPACE_TAB
-      // broadcast, which every content script in this tab also observes) — ignore it
-      // and let the intended recipient (the service worker) handle it.
+      // Not a WorkzoneCommand-shaped message — ignore it and let the intended
+      // recipient handle it.
       return false;
     }
 

@@ -19,6 +19,14 @@ CDM, tokens, or other customer data in any report.
   `host_permissions`, no `<all_urls>`, no `cookies`/`webRequest`.
 - All executable code is bundled at build time — no remote scripts, no `eval`, no
   `new Function`. Verified by `pnpm verify:no-remote-code` in CI.
+- The floating button's in-page overlay embeds the side panel bundle via
+  `web_accessible_resources`, scoped to `*://*.hana.ondemand.com/*` — the same
+  match-pattern limitation as the content scripts above. This lets any page matching
+  that wildcard load the extension's UI in an iframe (not only genuinely eligible Work
+  Zone admin routes), but grants no additional command-execution capability: the
+  content script independently re-validates real page eligibility before running any
+  command, regardless of what embedded the UI. See `docs/system-architecture.md`'s
+  Security Boundaries section for the full trade-off.
 - The side panel can only request a fixed, schema-validated set of commands from the
   packaged page runtime — never an arbitrary URL, GraphQL document, or script.
 - Every mutating action requires explicit user confirmation before it runs (see

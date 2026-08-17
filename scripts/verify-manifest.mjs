@@ -71,6 +71,13 @@ export function validateManifest(manifest) {
       }
     }
   }
+  for (const entry of manifest.web_accessible_resources ?? []) {
+    for (const match of entry.matches ?? []) {
+      if (BROAD_MATCH_PATTERNS.includes(match)) {
+        errors.push(`web_accessible_resources match pattern is too broad: ${match}`);
+      }
+    }
+  }
 
   return { valid: errors.length === 0, errors };
 }

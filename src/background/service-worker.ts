@@ -1,88 +1,10 @@
 import { validateIncomingPanelMessage } from "../messaging/validation";
-import { isUiMessage } from "../messaging/ui-protocol";
 import type { WorkzoneCommand } from "../messaging/protocol";
 import type { WorkzoneCommandResponse } from "../page-runtime/runtime-types";
 
 chrome.runtime.onInstalled.addListener(async () => {
   await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 });
-
-// Tracks the single reusable workspace tab (mirrors the "focus, don't duplicate" pattern
-// used by the floating in-page button). Persisted in chrome.storage.session — not a
-// plain module variable — because MV3 service workers are terminated after ~30s of
-// inactivity and restart with fresh module state on the next event; an in-memory
-// variable would "forget" an already-open workspace tab and start duplicating it.
-const WORKSPACE_TAB_STORAGE_KEY = "workspaceTabId";
-
-async function getStoredWorkspaceTabId(): Promise<number | null> {
-  const stored = await chrome.storage.session.get(WORKSPACE_TAB_STORAGE_KEY);
-  const value = stored[WORKSPACE_TAB_STORAGE_KEY];
-  return typeof value === "number" ? value : null;
-}
-
-async function setStoredWorkspaceTabId(tabId: number | null): Promise<void> {
-  if (tabId === null) {
-    await chrome.storage.session.remove(WORKSPACE_TAB_STORAGE_KEY);
-  } else {
-    await chrome.storage.session.set({ [WORKSPACE_TAB_STORAGE_KEY]: tabId });
-  }
-}
-
-chrome.tabs.onRemoved.addListener((tabId) => {
-  void (async () => {
-    if ((await getStoredWorkspaceTabId()) === tabId) {
-      await setStoredWorkspaceTabId(null);
-    }
-  })();
-});
-
-function workspaceTabUrl(sourceTabId: number | undefined): string {
-  const base = chrome.runtime.getURL("sidepanel/index.html");
-  return sourceTabId === undefined ? base : `${base}?sourceTabId=${sourceTabId}`;
-}
-
-async function openOrFocusWorkspaceTabNow(sourceTabId: number | undefined): Promise<void> {
-  const url = workspaceTabUrl(sourceTabId);
-  const existingTabId = await getStoredWorkspaceTabId();
-
-  if (existingTabId !== null) {
-    try {
-      const tab = await chrome.tabs.get(existingTabId);
-      if (tab.id === undefined) {
-        throw new Error("workspace tab has no id");
-      }
-      // Re-navigate so the tab is rebound to whichever SAP tab most recently asked
-      // for it, even if it was already open and bound to a different one.
-      await chrome.tabs.update(tab.id, { active: true, url });
-      if (tab.windowId !== undefined) {
-        await chrome.windows.update(tab.windowId, { focused: true });
-      }
-      return;
-    } catch {
-      // Tab was closed outside of onRemoved's notice (e.g. window closed); fall through.
-      await setStoredWorkspaceTabId(null);
-    }
-  }
-
-  const created = await chrome.tabs.create({ url });
-  await setStoredWorkspaceTabId(created.id ?? null);
-}
-
-// Serializes concurrent OPEN_WORKSPACE_TAB calls (e.g. a double-click, or two
-// different eligible tabs' buttons clicked in quick succession) so each one sees the
-// previous call's result before deciding whether to create vs. focus — without this,
-// two calls landing before the first chrome.tabs.create() resolves would both see "no
-// workspace tab yet" and create two.
-let workspaceTabOpQueue: Promise<void> = Promise.resolve();
-
-function openOrFocusWorkspaceTab(sourceTabId: number | undefined): Promise<void> {
-  const next = workspaceTabOpQueue.then(
-    () => openOrFocusWorkspaceTabNow(sourceTabId),
-    () => openOrFocusWorkspaceTabNow(sourceTabId),
-  );
-  workspaceTabOpQueue = next;
-  return next;
-}
 
 function notEligibleResponse(message: string): WorkzoneCommandResponse {
   return { ok: false, error: { code: "NOT_SAP_WORKZONE_PAGE", message } };
@@ -100,6 +22,14 @@ type ResolvedTab =
  * extension does not declare). Host/route eligibility is enforced downstream by the
  * content script itself once the message reaches it — it has full, unredacted access
  * to its own page's location, no permission needed for that.
+ *
+ * `targetTabId` is currently always `undefined` in practice: it existed to bind a
+ * separate workspace *tab* back to the SAP tab that opened it (via `?sourceTabId=`,
+ * `src/sidepanel/workspace-context.ts`), a flow removed in favor of an in-page overlay
+ * (`src/content/workzone-overlay.ts`) that already runs inside the SAP tab itself, so
+ * "active tab" resolution is correct without it. Left in place — narrowing the wire
+ * protocol touches ~30 unrelated tests for no behavior change — but no current caller
+ * sets it.
  */
 async function resolveTargetTabId(targetTabId: number | undefined): Promise<ResolvedTab> {
   if (targetTabId !== undefined) {
@@ -153,6 +83,9 @@ async function runCommandOnActiveTab(
   targetTabId: number | undefined,
 ): Promise<WorkzoneCommandResponse> {
   const resolved = await resolveTargetTabId(targetTabId);
+  // Unreachable with today's only two callers (docked panel, in-page overlay) — both
+  // always pass targetTabId=undefined, so resolveTargetTabId() never returns this
+  // status. Kept for the vestigial explicit-targetTabId path (see its docstring above).
   if (resolved.status === "target_tab_closed") {
     return {
       ok: false,
@@ -171,24 +104,7 @@ async function runCommandOnActiveTab(
   return relayCommandToContentScript(resolved.tabId, command, payload);
 }
 
-chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse) => {
-  if (isUiMessage(message)) {
-    if (message.type === "OPEN_WORKSPACE_TAB") {
-      // sender.tab.id is always the tab the content script is running in — this is
-      // how we know which SAP tab to bind the workspace tab to, without trusting
-      // anything the message payload itself might claim.
-      openOrFocusWorkspaceTab(sender.tab?.id)
-        .then(() => sendResponse({ ok: true }))
-        .catch((error: unknown) => {
-          sendResponse({
-            ok: false,
-            message: error instanceof Error ? error.message : "Unknown error",
-          });
-        });
-      return true;
-    }
-  }
-
+chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
   const parsed = validateIncomingPanelMessage(message);
   if (!parsed.ok) {
     sendResponse({ ok: false, error: parsed.error });
